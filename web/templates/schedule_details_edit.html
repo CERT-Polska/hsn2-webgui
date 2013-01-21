@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% load adminmedia %}
+
+{% block extrahead %}
+<!--  <script type="text/javascript" src="/site_media/js/job_details.js"></script>-->
+{% endblock %}
+
+{% block title %}Jobs Schedule{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="/schedule/">Jobs Schedule</a> &rsaquo; 
+    <a href="/schedule/{{ scheduledJob.id }}">{{ scheduledJob.job_name }}</a> &rsaquo; edit
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% include "job_form.html" %}
+
+{% endblock %}

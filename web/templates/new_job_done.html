@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block extrahead %}
+<!--    <script type="text/javascript" src="/static/js/create_job.js"></script>-->
+{% endblock %}
+
+{% block title %}New job created{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="/newjob/">Create New Job</a> &rsaquo; Job '{{ scheduledJob.job_name }}' created
+</div>
+{% endblock %}
+
+{% block content %}
+
+<fieldset>
+     <legend>Created job</legend>
+     <div>
+        <span class="label">Job name:</span>
+        <span class="label">{{ scheduledJob.job_name }}</span>
+     </div>
+     
+     <div>
+        <span class="label">RSS:</span>
+        <span class="label">
+            <a href="/feeds/{{ scheduledJob.id }}/all/">All</a> | 
+            <a href="/feeds/{{ scheduledJob.id }}/nonbenign/">Non-Benign</a>
+        </span>
+     </div>     
+     
+</fieldset>
+
+
+{% endblock %}

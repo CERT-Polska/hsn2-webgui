@@ -1,0 +1,27 @@
+{% if list_no_value %}
+<span class="dataListTitleEmpty">{{ name }} <span class="italic">(empty list)</span></span><ul>
+{% endif %}
+{% if list_w_value %}
+<span class="dataListTitle pointer"><span class="listFolding">+</span> {{ name }} </span><ul>
+{% endif %}
+{% if text_gt_130 %}
+<span class="dataKeyText">{{ name }}</span><pre class="pointer dataValueTextPretty">{{ value }}</pre>
+{% endif %}
+{% if text_lt_130 %}
+<span class="dataKeyText">{{ name }}</span><span class="dataValueText">{{ value }}</span>
+{% endif %}
+{% if boolean %}
+<span class="dataKeyBoolean">{{ name }}</span><span class="dataValue{{ value }}">&nbsp;</span>
+{% endif %}
+{% if integer %}
+<span class="dataKeyInteger">{{ name }}</span><span class="dataValueInteger">{{ value }}</span>
+{% endif %}
+{% if time %}
+<span class="dataKeyTime">{{ name }}</span><span class="dataValueTime">{{ value }}</span>
+{% endif %}
+{% if attachment_w_node %}
+<span class="dataKeyAttachment">{{ name }}</span><a href="/getattachment/{{ node }}/{{ value }}/" class="dataValueAttachment">{{ value }}</a>
+{% endif %}
+{% if attachment_no_node %}
+<span class="dataKeyAttachment">{{ name }}</span><span class="dataValueAttachment">{{ value }} (could not make link)</span>
+{% endif %}

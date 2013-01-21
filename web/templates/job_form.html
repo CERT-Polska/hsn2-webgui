@@ -1,0 +1,147 @@
+
+{% if message %}
+
+<div>{{ message }}</div>
+
+{% else %}
+<div>
+    <form enctype="multipart/form-data" method="post" action="." id="form_job">{% csrf_token %}
+       <fieldset>
+            <legend>Workflow</legend>
+            <div>
+                <label for="id_workflow" class="label">Select a workflow: *</label>
+                {{ jobForm.workflow }}
+                {{ jobForm.workflow.errors }}
+            </div>
+			<div>
+				<span class="label align_top">Workflow description:</span>
+				<pre class="label" id="workflow_description">{{ jobForm.workflow_description.value }}</pre>
+				<input type="hidden" name="workflow_description" id="hid_workflow_description" value="{{ jobForm.workflow_description.value }}">
+			</div>
+			
+			{% if feederFileIsUsed %}
+			<div id="feeder_file_is_uploaded">
+				<span class="label align_top">Feeder file:</span> 
+		        <span id="span_feeder_file_is_uploaded" class="label">A file has been submitted for this workflow.<br><span class="span_link pointer" id="replace_feeder_file">Replace or delete uploaded file</span></span>
+		        <input type="hidden" name="feederFileIsUsed" id="id_feederFileIsUsed" value="{{ feederFileIsUsed }}">
+ 			</div>
+			{% endif %}
+			 
+			<div class="hide align_top" id="feeder_file_upload">
+		        <label for="id_feeder_file" class="label" id="label_feeder_file">Feeder file:</label>
+				{{ jobForm.feeder_file }}
+				{{ jobForm.feeder_file.errors }}
+	        </div>
+
+            <div>
+                <label for="workflow_parameter" class="label align_top">Workflow parameters:<br>(optional)</label>
+                <div class="label align_top">
+                	<span class="inline width_default">Service</span>
+                	<span class="inline width_default">Parameter name</span>
+                	<span class="inline width_default">Parameter value</span>
+
+
+                	{% if jobForm.workflow_parameter_service_1 %}
+	                	{% for parameterGroupNumber in parameterGroupNumbers %}
+
+				    <div class="parameters_div" data-parameterscount="{{ parameterGroupNumber }}">	                	
+	                		{% for parameterPrefix in parameterPrefixes %}
+
+		                		{% for field in jobForm %}
+
+				                	{% if field.html_name == parameterPrefix|add:parameterGroupNumber %}
+				                		{% if field.errors %}
+						                	{{ field.errors }}<br><br>
+						                {% endif %}
+
+			            	    		{{ field }}
+					    
+				                	{% endif %}
+		    	            	{% endfor %}
+		    	            {% endfor %}
+		    	    	<img src="/static_admin/img/admin/icon_deletelink.gif" class="pointer btn_remove_parameter {% if parameterGroupNumber == '1' %}hide{% endif %}">
+            		</div>
+						{% endfor %}
+
+                	{% else %}
+	                <div class="parameters_div" data-parameterscount="1">
+		                <input type="text" id="id_workflow_parameter_service_1" name="workflow_parameter_service_1" class="minwidth_200 workflow_parameter_service" placeholder="Service">
+		                <input type="text" id="id_workflow_parameter_name_1" name="workflow_parameter_name_1" class="minwidth_200 workflow_parameter_name" placeholder="Parameter name">
+		                <input type="text" id="id_workflow_parameter_value_1" name="workflow_parameter_value_1" class="minwidth_200 workflow_parameter_value" placeholder="Parameter value">
+		                <img src="/static_admin/img/admin/icon_deletelink.gif" class="pointer btn_remove_parameter hide">
+	               	</div>
+	               	{% endif %}
+	               	
+	               	<span class="span_link inline pointer" id="add_parameter">Add parameter</span>
+               	</div>
+            </div>
+
+			<div>
+				<span class="label align_top span_link pointer" id="toggle_workflow_xml">Show/Hide workflow XML</span>
+				<pre class="hide" id="workflow_xml">{{ jobForm.workflow_xml.value }}</pre>
+				<input type="hidden" name="workflow_xml" id="hid_workflow_xml" value="{{ jobForm.workflow_xml.value }}">
+			</div>
+            
+       </fieldset>
+    
+       <fieldset>
+            <legend>Scheduling</legend>
+            <div>
+                <span class="label">When to run the job? *</span>           
+               {{ jobForm.schedule_when }}
+               {{ jobForm.schedule_when.errors }}
+            </div>
+            <span id="span_scheduling_options">Date, time and frequency options</span>          
+            <div id="div_scheduling_options" style="display:None">
+                <div class="schedule_later_options">
+                    <label for="id_schedule_later_date" class="label">Start date:</label>
+                    {{ jobForm.schedule_date }}
+                    {{ jobForm.schedule_date.errors }}
+                </div>
+                <div class="schedule_later_options">
+                    <label for="id_schedule_later_time" class="label">Start time:</label>
+                    {{ jobForm.schedule_time }}
+                    {{ jobForm.schedule_time.errors }}
+                </div>
+                <div class="schedule_later_options">
+                
+                    <span class="label">Frequency:</span>               
+                    {{ jobForm.schedule_frequency }}
+                    {{ jobForm.schedule_frequency.errors }}
+                </div>
+            </div>
+       </fieldset>
+    
+       <fieldset>
+            <legend>Job details</legend>
+            <div>
+                <label for="id_job_name" class="label">Job name: *</label>
+                {{ jobForm.job_name }}
+                {{ jobForm.job_name.errors }}
+            </div>
+            <div>
+                <span class="label">Others may view and edit <br> my job *</span>
+                {{ jobForm.is_public }}
+                {{ jobForm.is_public.errors }}
+            </div>
+       </fieldset>
+       <span class="floatright">* required</span><br>
+       <input type="button" class="gradient" id="btn_save" value="Save">
+       
+       {% if jobForm.job_name.value %}
+       <input type="hidden" id="id_edit_processed_jobs" name="edit_processed_jobs" value="">
+       <input type="hidden" id="id_is_public_org" name="is_public_org" value="{{ jobForm.is_public.value }}">
+       {{ jobForm.edit_processed_jobs.errors }}
+       {{ jobForm.is_public_org.errors }}
+       
+       {% endif %}
+    </form>
+</div>
+{% endif %}
+
+{% block extrahead %}
+    <script type="text/javascript" src="/static/js/apprise-1.5.min.js"></script>
+    <script type="text/javascript" src="/static/js/use_ajax.js"></script>
+    <script type="text/javascript" src="/static/js/job_form.js"></script>
+    <link rel="stylesheet" type="text/css" href="/static/css/apprise.min.css">
+{% endblock %}

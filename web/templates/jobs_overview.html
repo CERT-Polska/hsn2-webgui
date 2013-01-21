@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% load ifjobrights %}
+
+{% block extrahead %}
+<!--  <script type="text/javascript" src="/site_media/js/job_overview.js"></script>-->
+{% endblock %}
+
+{% block title %}Jobs Overview{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">Jobs Overview</div>
+{% endblock %}
+
+{% block content %}
+
+<table class="tbl_overview">
+    <thead>
+        <tr class="topdowngradient">
+            <th>Job Name</th>
+            <th>Submitted</th>
+            <th>Finished</th>
+            <th>Current scheduling</th>
+            <th>Feeds</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+{% for job in jobs.object_list %}
+    {% ifjobrights job user %}
+        <tr>
+            <td ><a href="/job/{{ job.id }}">{{ job.name }}</a></td>
+            <td class="nowrap">{{ job.started|date:"N d, Y, H:i" }}</td>
+            <td class="nowrap">{{ job.finished|date:"N d, Y, H:i" }}</td>
+            <td class="nowrap">
+                <a href="/schedule/{{ job.schedule.id }}/">
+	            {% if job.schedule.scheduled_start %}
+	            	{% if job.schedule.frequency <= 4 %}
+		                {{ job.schedule.get_frequency_display }} at {{ job.schedule.scheduled_start|date:"H:i" }}
+	                {% else %}
+		                {{ job.schedule.get_frequency_display }}
+                	{% endif %}
+	            {% else %}
+	            As Soon As Possible
+	            {% endif %}                
+                </a>
+            </td>            
+            <td class="nowrap">
+                <a href="/feeds/{{ job.schedule.id }}/all/">All</a> | 
+                <a href="/feeds/{{ job.schedule.id }}/nonbenign/">Non-Benign</a>
+            </td>
+            <td><span class="{{ job.get_status_display|lower }} bold">{{ job.get_status_display|upper }}</span></td>
+        </tr>
+        
+        {% endifjobrights %}
+         
+{% endfor %}    
+    
+    </tbody>
+</table>
+
+<div class="pagination">
+    <span class="step-links">
+
+        {% if jobs.has_previous %}
+            <a href="?page={{ jobs.previous_page_number }}"><img src="/static/img/left_24.png"></a>
+        {% else %}
+        <img src="/static/img/left_24.png" class="img_disabled">
+        {% endif %}
+
+        <span class="current">
+            {{ jobs.start_index }} - {{ jobs.end_index }} of {{ jobs.paginator.count }}
+        </span>
+
+        {% if jobs.has_next %}
+            <a href="?page={{ jobs.next_page_number }}"><img src="/static/img/right_24.png"></a>
+        {% else %}
+        <img src="/static/img/right_24.png" class="img_disabled">
+        {% endif %}            
+
+    </span>
+</div>
+
+{% endblock %}

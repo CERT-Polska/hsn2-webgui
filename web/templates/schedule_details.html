@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block extrahead %}
+<script type="text/javascript" src="/static/js/use_ajax.js"></script>
+<script type="text/javascript" src="/static/js/schedule_details.js"></script>
+{% endblock %}
+
+{% block title %}Jobs Schedule{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="/schedule/">Jobs Schedule</a> &rsaquo; {{ scheduledJob.job_name }}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if scheduledJob.created_by == user or user.is_superuser %}
+<ul class="object-tools">
+    <li>
+      <a href="/schedule/edit/{{ scheduledJob.id }}" class="">Edit schedule</a>
+    </li>
+    <li>
+    {% if scheduledJob.is_enabled  %}
+      <a href="#" class="" id="btn_disableSchedule" data-jobid="{{ scheduledJob.id }}">Disable schedule</a>
+    {% else %}  
+      <a href="#" class="" id="btn_disableSchedule" data-jobid="{{ scheduledJob.id }}">Enable schedule</a>
+    {% endif %}
+    </li>
+    <li>
+      <a href="#" class="" id="btn_deleteSchedule" data-jobid="{{ scheduledJob.id }}">Delete schedule</a>
+    </li>
+</ul>
+{% endif %}
+
+<div class="error" id="div_errorMessage" style="display:none;"></div>
+
+<fieldset>
+     <legend>Job schedule summary</legend>
+     <div class="error" id="div_jobDisabled" {% if scheduledJob.is_enabled == 1 %}style="display:none;"{% endif %}>
+     This job schedule has been disabled and will not participate in scheduling.
+     </div>
+     <div>
+        <span class="label">Job name:</span>
+        <span class="label">{{ scheduledJob.job_name }}</span>
+     </div>
+     <div>
+        <span class="label">Selected workflow:</span>
+        <span class="label">{{ scheduledJob.workflow.name }}</span>
+     </div>
+     <div>
+     	<span class="label">Added parameters:</span>
+     	<span class="label align_top">
+     		<ul class="">
+     		{% for p in scheduledJob.parameters.all %}
+     			<li>{{ p.service }}.{{ p.param_key }}={{ p.param_value }}</li><br>
+     		{% endfor %}
+     		</ul>
+     	</span>
+     </div>
+     <div>
+        <span class="label">Job is scheduled to run:</span>
+        <span class="label">
+            {% if scheduledJob.scheduled_start %}
+            	{% if scheduledJob.frequency <= 4 %}
+                	{{ scheduledJob.get_frequency_display }} at {{ scheduledJob.scheduled_start|date:"H:i" }}
+                {% else %}
+                	{{ scheduledJob.get_frequency_display }}
+                {% endif %}
+            {% else %}
+            As Soon As Possible
+            {% endif %}
+        </span>
+     </div>
+     <div>
+        <span class="label">Created by:</span>
+        <span class="label">
+            {% if scheduledJob.created_by.first_name or scheduledJob.created_by.last_name %}
+                {{ scheduledJob.created_by.first_name|add:" "|add:scheduledJob.created_by.last_name }}
+            {% else %}
+                {{ scheduledJob.created_by }}
+            {% endif %}
+        </span>
+     </div>     
+     <div>
+        <span class="label">Job <span class="italic">{% if scheduledJob.is_public %}can{% else %}can not{% endif %}</span> be viewed by others.</span>
+     </div>
+</fieldset>
+
+<table class="tbl_overview">
+    <thead>
+        <tr class="topdowngradient">
+            <th>Started</th>            
+            <th>Finished</th>
+            <th>Status</th>            
+        </tr>
+    </thead>
+    <tbody>
+    {% for job in jobs %}
+        <tr>
+            <td class="nowrap"><a href="/job/{{ job.id }}/">{{ job.started|date:"N d, Y, H:i" }}</a></td>
+            <td class="nowrap">{{ job.finished|date:"N d, Y, H:i" }}</td>
+            <td><span class="{{ job.get_status_display|lower }} bold">{{ job.get_status_display|upper }}</span></td>            
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}

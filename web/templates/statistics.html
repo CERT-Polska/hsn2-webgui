@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Statistics{% endblock %}
+
+{% block extrahead%}
+<!--[if lte IE 8]><script language="javascript" type="text/javascript" src="excanvas.min.js"></script><![endif]-->
+<script type="text/javascript" src="/static/flot/jquery.flot.min.js"></script>
+<script type="text/javascript" src="/static/js/statistics.js"></script>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">Statistics</div>
+{% endblock %}
+
+{% block content %}
+
+<table class="tbl_overview tbl_statistics">
+	<tr class="topdowngradient">
+		<th colspan="2">Job statistics *</th>
+	</tr>
+{% for stats, count in jobStatistics.items %}
+	{% if stats != 'total' %}
+	<tr>
+		<td><span class="{{ stats }} bold">{{ stats|capfirst }}</span> jobs:</td>
+		<td class="td_numbers">{{ count }}</td>
+	</tr>
+	{% endif %}
+{% endfor %}
+	<tr class="tr_total">
+		<td>Total jobs:</td>
+		<td class="bold td_numbers">{{ jobStatistics.total }}</td>
+	</tr>
+	
+</table>
+
+<table class="tbl_overview tbl_statistics">
+	<tr class="topdowngradient">
+		<th colspan="2">URL statistics **</th>
+	</tr>
+{% for stats, count in urlStatistics.items %}
+	{% if stats != 'total' %}
+	<tr>
+		<td><span class="{{ stats }} bold">{{ stats|capfirst }}</span> urls:</td>
+		<td class="td_numbers">{{ count }}</td>
+	</tr>
+	{% endif %}
+{% endfor %}
+	<tr class="tr_total">
+		<td>Total urls:</td>
+		<td class="bold td_numbers">{{ urlStatistics.total }}</td>
+	</tr>
+</table><br>
+<span>*webbased submitted jobs.</span><br>
+<span>**URLs which use a URL Reporter</span>
+<br>
+
+<hr class="hr_default">
+<input type="hidden" id="stats_total_urls" value="{{ totalUrlsJSON }}">
+<input type="hidden" id="stat_avg_urls_per_minute" value="{{ avgUrlsPerMinuteJSON }}">
+<div class="statistics_graph_title">Total number of URLs being processed over time</div>
+<div id="graph_total_urls" class="statistics_graph"></div>
+<hr class="hr_default">
+<div class="statistics_graph_title">Average number of URLs being processed per minute over time</div>
+<div id="graph_avg_urls_per_minute" class="statistics_graph"></div>
+
+{% endblock %}

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+    <head>
+       <title>HoneySpider Network | {% block title %}{% endblock %}</title>
+       <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+       <link href="/static/css/reset.css" rel="stylesheet" type="text/css">
+       <link href="/static/css/main.css" rel="stylesheet" type="text/css">
+
+       <script type="text/javascript" src="/static/js/jquery.js"></script>
+       <script type="text/javascript" src="/static/js/main.js"></script>
+       {% block extrahead %}{% endblock %}
+    </head>
+<!--[if gte IE 9]>
+  <style type="text/css">
+    .gradient {
+       filter: none;
+    }
+  </style>
+<![endif]-->
+
+    <body class="topdowngradient gradient">
+    {% if user.is_authenticated %}
+	    <div id="linkbar" class="topdowngradient gradient">
+
+	        <div class="inner">
+	           <div>
+<!--                <img src="/static/img/HSN_text.png" id="hsn_title">-->
+                <img src="/static/img/HSN_text2.png" id="hsn_title">
+                {% if user.is_authenticated %}
+                <ul id="linkbar-list" class="floatright">
+                    {% if user.is_superuser %}
+                    <li><a href="/admin/" id="admin_link">Admin</a></li>
+                    {% endif %}
+                    <li><a href="/about/" class="{% if about_selected %}selectedMenuItem{% endif %}">About</a></li>
+                    <li><a href="/password/" id="change_password_link">Change password</a></li>
+                    {% if sso_enabled %}
+                    <li><a href="/switchuser/">Switch user {{ user.username }}</a></li>
+                    {% else %}
+                    <li><a href="/logout/" title="Log out {{ user.username }}">Log out</a></li>
+                    {% endif %}
+                </ul>
+                {% endif %}
+               </div>
+	        </div>
+	    </div>
+
+    <div id="menubar">
+
+        <div class="inner">
+            <img src="/static/img/LOGO_h80.png" id="hsn_logo">
+            <ul style="display: inline-block">
+                <li><a href="/jobs/" class="{% if jobs_selected %}selectedMenuItem{% endif %}">Jobs Overview</a></li>
+                <li><a href="/schedule/" class="{% if schedule_selected %}selectedMenuItem{% endif %}">Jobs Schedule</a></li>
+                <li><a href="/newjob/" class="{% if createjob_selected %}selectedMenuItem{% endif %}">Create New Job</a></li>
+                <li><a href="/statistics/" class="{% if statistics_selected %}{{ statistics_selected }}{% endif %}">Statistics</a></li>
+            </ul>
+        </div>
+
+    </div>
+    {% endif %}
+
+	    <div id="content">
+	        <div class="inner">
+	            <div class="block">
+                {% block breadcrumbs %}{% endblock %}
+
+    	        {% block content %} {% endblock %}
+		        </div>
+	        </div>
+	    </div>
+
+	    <div id="footer">
+	        <div class="inner">
+	            <span> &copy; 2012 NASK & NCSC-NL</span>
+	        </div>
+	    </div>
+    </body>
+</html>

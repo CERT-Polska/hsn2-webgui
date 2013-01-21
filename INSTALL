@@ -1,0 +1,136 @@
+== install on webserver ==
+-- install MySQL
+-- install apache
+-- install mod_wsgi for apache
+-- install couchdb (if it's not installed for HSN2 framework yet)
+
+== on Ubuntu the following was required before proceding ==
+apt-get install python-dev
+apt-get install libmysqlclient-dev
+
+== install python packages ==
+# packages can also be installed using setuptools (easy_install)
+pip install django
+pip install MySQL-python
+pip install pika
+# pycrypto is required by paramiko
+pip install pycrypto 
+pip install paramiko
+pip install CouchDB
+
+-- install dateutil for python 2.X
+# first check which version of dateutil will be installed, 
+# on some occasions it will install the python 3.X version of dateutil
+# if so install from source:
+wget http://labix.org/download/python-dateutil/python-dateutil-1.5.tar.gz
+# unpack and cd to python-dateutil-1.5
+python setup.py install
+# otherwise pip or easy_install can be used (pip install python-dateutil)
+
+-- install protobuf like you would do when installing HSN2 Console:
+# install from source
+wget http://protobuf.googlecode.com/files/protobuf-2.4.1.tar.gz
+./configure
+make
+make install
+# cd TO PYTHON SUBDIR
+python setup.py install
+
+# install using pip (not tested)
+pip install protobuf
+
+== install HSN2 protobuf files ==
+# Go to trunk/software/Commons/protocol/python
+mkdir -p /opt/hsn2/python/proto
+# do 'make' and ignore the error
+cp -r ./pb/*.py /opt/hsn2/python/proto 
+
+== install HSN2 communication lib ==
+# at time of writing not all comm. lib files are in software/Commons,
+# but partly in software/Commons and partly in software/Console
+mkdir /opt/hsn2/python/commlib
+cp trunk/software/Commons/communication-lib/*.py /opt/hsn2/python/commlib
+
+== install HSN2 web GUI ==
+-- copy web gui files to /srv/www/hsn2
+-- login to mysql as root
+-- create mysql user and HSN2 database:
+mysql> CREATE USER 'hsn2'@'localhost' IDENTIFIED BY 'somepassword';
+mysql> CREATE DATABASE hsn2;
+mysql> GRANT ALL ON hsn2.* TO 'hsn2'@'localhost';
+
+# check/change settings in /srv/www/hsn2/web/settings.py
+# change SECRET_KEY setting in settings.py to a random string! (Used to provide a seed in secret-key hashing algorithms)
+# create database tables and admin for web gui: 
+cd /srv/www/hsn2/web
+python manage.py syncdb
+
+== set file rights for web gui and scheduler ==
+# note that files which are uploaded in upload dir 
+# must be readable for the user who started the scheduler 
+-- create an hsn2 user on machine
+adduser hsn2
+-- set file permissions and ownership accordingly: 
+
+/srv/www
+drwxr-xr-x  apache apache hsn2
+
+/srv/www/hsn2
+drwx------  apache apache apache
+drwxr-x---  apache hsn2   etc
+drwx------  hsn2   hsn2   test
+drwxr-x---  apache hsn2   web
+
+drwxr-x---  apache hsn2   analysis
+-rwxr-x---  apache hsn2   couchdb_views.py
+-rw-r-----  apache hsn2   README
+drwxr-x---  apache hsn2   url
+
+/srv/www/hsn2/web
+drwxr-x---  apache hsn2   app
+-rw-r-----  apache hsn2   hsn2.conf
+-rw-------  apache apache __init__.py
+-rwxr-----  apache hsn2   logging.conf
+-rw-------  apache apache manage.py
+-rwxr-x---  apache hsn2   settings.py
+drwx------  apache apache templates
+drwxr-s---  apache hsn2   upload
+-rw-------  apache apache urls.py
+
+/srv/www/hsn2/web/app
+-rw-------  apache apache admin.py
+drwx------  apache apache custom
+-rw-------  apache apache feeds.py
+-rw-------  apache apache forms.py
+-rw-------  apache apache __init__.py
+-rw-r-x---  apache hsn2   models.py
+drwx------  apache apache static
+drwx------  apache apache static_admin
+drwx------  apache apache templatetags
+-rw-r-x---  apache hsn2   tools.py
+-rw-------  apache apache views.py
+
+== sync couchdb views ==
+# insert views into couchdb
+# hsn db has not yet been created in couchdb:
+curl -X PUT http://localhost:5984/hsn
+
+# sync views:
+cd /srv/www/hsn2/etc/couchdb_views
+python couchdb_views.py -s
+
+== add HSN2 to apache conf ==
+# add /srv/www/hsn2/apache/hsn2.conf to apache conf in /etc/apache...
+# restart apache
+
+== Scheduler ==
+# change settings in /srv/www/hsn2/etc/schedule.conf 
+# for sftp settings, if password is supplied, pkey settings will be ignored
+# start scheduler
+python scheduler.py start
+# stop scheduler
+python scheduler.py stop
+
+== Wokflows ==
+# sync workflows
+python synchronizer.py workflows

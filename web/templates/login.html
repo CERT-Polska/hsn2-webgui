@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+
+{% block extrahead%}
+  <script type="text/javascript" src="/static/js/login.js"></script>
+{% endblock %}
+
+{% block content %}
+    
+    <form method="post" action="." id="form_login" class="form_general">{% csrf_token %}
+<!--        <img src="/static/img/LOGO_big_light2.png" style="margin-left: auto; margin-right: auto; display: block">-->
+        <img src="/static/img/logo.png" style="margin-left: auto; margin-right: auto; display: block">
+        <div style="text-align: center; font-size: 30px; font-weight: bold;">HONEYSPIDER<br>NETWORK</div> 
+        <fieldset id="login_fieldset" class="centerblock">
+            <legend>Login</legend>
+            <div>
+                {{ form.username }}
+            </div>
+            <div>
+                {{ form.password }}
+            </div>
+            {% if sso_enabled and remote_user %}        
+            <div>
+                <span>Or login as <a href="/">{{ remote_user }}</a></span>
+            </div>
+            {% endif %}
+        </fieldset>
+        <div class="centerblock">
+            <input type="submit" value="login" style="margin-bottom: 20px;" />
+	        {% if form.errors %}
+	        <br><span class="error_message">Your username and password didn't match. Please try again.</span>
+	        {% endif %}      
+        </div>
+
+        <input type="hidden" name="next" value="{% if next %}{{ next }}{% else %}/{% endif %}" />
+    </form>
+{% endblock %}

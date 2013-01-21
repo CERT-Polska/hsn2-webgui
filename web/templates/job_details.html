@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% load split %}
+
+{% block extrahead %}
+  <script type="text/javascript" src="/static/js/DataTables/jquery.dataTables.min.js"></script>
+  <script type="text/javascript" src="/static/js/job_details.js"></script>
+{% endblock %}
+
+{% block title %}Details of "{{ job.name }}"{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="/jobs/">Jobs Overview</a> &rsaquo; {{ job.name }} [{{ job.started|date:"d-m-Y H:i" }}]
+</div>
+{% endblock %}
+
+{% block content %}
+
+<fieldset>
+     <legend>Job summary</legend>
+     <div>
+        <span class="label bullet">Job name:</span>
+        <span class="label">{{ job.name }}</span>
+     </div>
+
+     <div>
+        <span class="label bullet">Owner:</span>
+        <span class="label">
+            {% if job.owner.first_name or job.owner.last_name %}
+                {{ job.owner.first_name|add:" "|add:job.owner.last_name }}
+            {% else %}
+                {{ job.owner }}
+            {% endif %}
+        </span>         
+        
+<!--        <span class="label bullet">-->
+<!--        Selected feeder:</span>-->
+<!--        <span class="label">{{ selectedFeeder.name }}</span>        -->
+        
+     </div>
+
+     <div>
+        <span class="label bullet">Current schedule:</span>
+        <span class="label">
+            <a href="/schedule/{{ job.schedule.id }}/">
+	            {% if job.schedule.scheduled_start %}
+	            	{% if job.schedule.frequency <= 4 %}
+		                {{ job.schedule.get_frequency_display }} at {{ job.schedule.scheduled_start|date:"H:i" }}
+	                {% else %}
+		                {{ job.schedule.get_frequency_display }}
+                	{% endif %}
+	            {% else %}
+	            As Soon As Possible
+	            {% endif %}                
+            </a>
+        </span>
+
+        
+        <span class="label bullet">Selected workflow:</span>
+        <span class="label">{{ job.workflow.name }}</span>        
+     </div>
+
+     <div>
+        <span class="label bullet">Started:</span>
+        <span class="label">{{ job.started|date:"N d, Y, H:i" }}</span>
+        
+        <span class="label bullet">Schedule feed:</span>
+        <span class="label">
+            <a href="/feeds/{{ job.schedule.id }}/all/">All</a> | 
+            <a href="/feeds/{{ job.schedule.id }}/nonbenign/">Non-Benign</a>
+        </span>       
+        
+     </div>
+     <div>
+        <span class="label bullet">Finished:</span>
+        <span class="label">{{ job.finished|date:"N d, Y, H:i" }}</span>
+        
+        <span class="label bullet">Job <span class="italic">{% if job.is_public %}can{% else %}can not{% endif %}</span> be viewed by others.</span>        
+     </div>
+
+     <div>
+        <span class="label bullet">Total number of urls:</span>
+        <span class="label">{{ urls|length }}</span>
+     </div>
+
+     {% for classification, urlCount in urlClassification.items %}
+     <div>
+        <span class="label bullet"><span class="{{ classification|lower }} bold">{{ classification|upper }}</span> urls:</span>
+        <span class="label">{{ urlCount }}</span>
+     </div>
+     {% endfor %}
+</fieldset>
+
+{% if urlsDataError %}
+
+<span>Could not retrieve url data: {{ urlsDataError }}</span>
+
+{% else %}
+<table class="tbl_dataTables" id="tbl_urls">
+    <thead>
+        <tr>
+            <th class="pointer">URL</th>            
+            <th class="pointer">Status</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for topAncestor, url in urls.items %}
+        <tr>
+<!--            <td><a href="/job/{{ job.id }}/analysis/{{ url.node|split:":"|slice:"1:2"|first }}/">{{ url.url }}</a></td>-->
+            <td><a href="/job/{{ job.id }}/analysis/{{ url.node }}/">{{ url.url }}</a></td>
+            <td><span class="{{ url.classification|lower }} bold">{{ url.classification|upper }}</span></td>            
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+{% endif %}
+{% endblock %}

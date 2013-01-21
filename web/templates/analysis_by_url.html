@@ -1,0 +1,10 @@
+{% extends "analysis_details.html" %}
+
+{% block tableTitleSetting %}
+{% with "Analysis for "|add:currentPage as tableTitle %}
+<div class="title"> {{ tableTitle|urlizetrunc:65 }}</div>
+{% endwith %}
+{% endblock %}
+{% block tableHeaderSetting %} Analyzer {% endblock %}
+
+{% block helpInfo %} Select an analyzer from the list above to display detailed analysis information. {% endblock %}

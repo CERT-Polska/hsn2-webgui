@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Analysis of "{{ job.name }}"{% endblock %}
+
+{% block extrahead %}
+<script type="text/javascript" src="/static/js/use_ajax.js"></script>
+<script type="text/javascript" src="/static/js/DataTables/jquery.dataTables.min.js"></script>
+<script type="text/javascript" src="/static/js/prettify.js"></script>
+<script type="text/javascript" src="/static/js/analysis_details.js"></script>
+<link type="text/css" rel="stylesheet" href="/static/css/prettify.css" >
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="/jobs/">Jobs Overview</a> &rsaquo; 
+    <a href="/job/{{ job.id }}">{{ job.name }} [{{ job.started|date:"d-m-Y H:i" }}]</a> &rsaquo; 
+    <a href="/job/{{ job.id }}/analysis/{{ node }}">{{ topLevelUrl }}</a> &rsaquo; 
+    {{ currentPage }}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if urlsDataError %}
+<span class="error">{{ urlsDataError }}</span>
+{% endif %}
+
+{% block tableTitleSetting %}{% endblock %}
+<table class="tbl_dataTables" id="tbl_urls">
+    <thead>
+        <tr>
+            <th class="pointer">{% block tableHeaderSetting %}{% endblock %}</th>            
+            <th class="pointer" style="min-width: 120px">Classification</th>
+        </tr>
+    </thead>
+    <tbody >
+{% for node, details in tableData.items %}
+        <tr>
+            <td><a href="javascript:;" id="{{ node }}" class="analyzedUrl">{{ details.column1 }}</a></td>
+            <td>
+                {% if details.classification %}
+                <span class="{{ details.classification|lower }} bold">{{ details.classification|upper }}</span>
+                {% else %}
+                <span>This analyzer has no classification</span>
+                {% endif %}
+            </td>            
+        </tr>
+{% endfor %}
+    </tbody>
+</table>
+<div id="analyzedUrlDataWrapper">
+	<div id="expandCollapseAll" style="" class="hide2">
+	    <span id="expandAll" class="pointer">+ All</span>
+	    <span id="collapseAll" class="pointer">&minus; All</span>
+	</div>
+    <div id="analyzedUrlData"><span class="italic">{% block helpInfo %}{% endblock %}</span></div>
+</div>
+
+
+{% endblock %}

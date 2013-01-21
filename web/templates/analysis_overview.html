@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Analysis of "{{ job.name }}"{% endblock %}
+
+{% block extrahead %}
+<script type="text/javascript" src="/static/js/DataTables/jquery.dataTables.min.js"></script>
+<script type="text/javascript" src="/static/js/analysis_overview.js"></script>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="/jobs/">Jobs Overview</a> &rsaquo; 
+    <a href="/job/{{ job.id }}">{{ job.name }} [{{ job.started|date:"d-m-Y H:i" }}]</a> &rsaquo; 
+    {{ urlSummary.url }}
+</div>
+{% endblock %}
+{% block content %}
+
+{% if urlsDataError %}
+
+<span class="error">{{ urlsDataError }}</span>
+{% endif %}
+
+<div class="title">{{ urlSummary.url|urlizetrunc:80 }}</div>
+<fieldset>
+     <legend>URL summary</legend>
+     <div>
+        <span class="label">The page is classified as:</span>
+        <span class="label {{ urlSummary.classification|lower }} bold">{{ urlSummary.classification|upper }}</span>
+     </div>
+     <div>
+        <span class="label">Number of subpages visited:</span>
+        <span class="label">{{ urlSummary.subpagesCount }}</span>
+     </div>
+</fieldset>
+
+<!--<fieldset>-->
+<!--     <legend>Alert</legend>-->
+<!--     {% for alert in urlSummary.alerts %}-->
+<!--     <div>-->
+<!--        <span class="label">Alert x:</span>-->
+<!--        <span class="label">{{ alert }}</span>-->
+<!--     </div>-->
+<!--     {% empty %}-->
+<!--     <div>-->
+<!--        <span class="label">There are no alerts. (not yet implemented in reporters)</span>-->
+<!--     </div>-->
+<!--     {% endfor %}-->
+<!--</fieldset>-->
+
+<fieldset>
+     <legend>URL summarized by analyzer</legend>
+     {% for analyzer, classification in analyzers.items %}
+     <div>
+        <span class="label"><a href="/job/{{ job.id }}/analysis/{{ node }}/byanalyzer/{{ analyzer }}/">{{ analyzer }}</a>:</span>
+        <span class="label {{ classification|lower }} bold">{{ classification|upper }}</span>
+     </div>
+     {% endfor %}
+</fieldset>
+
+<fieldset>
+     <legend>Job details for URL</legend>
+     <div>
+        <span class="label">Job name:</span>
+        <span class="label">{{ job.name }}</span>
+     </div>
+
+     <div>
+        <span class="label">Started:</span>
+        <span class="label">{{ job.started|date:"N d, Y, H:i" }}</span>
+     </div>
+     <div>
+        <span class="label">Finished:</span>
+        <span class="label">{{ job.finished|date:"N d, Y, H:i" }}</span>
+     </div>
+</fieldset>
+
+<table class="tbl_dataTables" id="tbl_urls">
+    <thead>
+        <tr>
+            <th class="pointer">Visited URLs</th>            
+            <th class="pointer" style="min-width: 120px">Classification</th>
+        </tr>
+    </thead>
+    <tbody >
+{% for subnode, details in urls.items %}
+        <tr>
+            <td><a href="/job/{{ job.id }}/analysis/{{ node }}/byurl/{{ subnode }}/" id="{{ subnode }}" class="analyzedUrl">{{ details.url }}</a></td>
+            <td><span class="{{ details.classification|lower }} bold">{{ details.classification|upper }}</span></td>            
+        </tr>
+{% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}

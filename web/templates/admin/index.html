@@ -1,0 +1,84 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" type="text/css" href="{% load adminmedia %}{% admin_media_prefix %}css/dashboard.css" />{% endblock %}
+
+{% block coltype %}colMS{% endblock %}
+
+{% block bodyclass %}dashboard{% endblock %}
+
+{% block breadcrumbs %}
+    <div class="breadcrumbs">Admin</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+
+{% if app_list %}
+    
+        <div class="">
+        <fieldset>
+            <legend>Main admin settings</legend>
+	{% for app in app_list %}
+	        {% for model in app.models %}
+	            <div>
+	            {% if model.perms.change %}
+	                <span class="label"><a href="{{ model.admin_url }}">{{ model.name }}</a></span>
+	            {% else %}
+	                <span class="label">{{ model.name }}</span>
+	            {% endif %}
+
+                {% if model.perms.change %}
+                    <span style="padding: 0 15px;"><a href="{{ model.admin_url }}" class="changelink">{% trans 'Change' %}</a></span>
+                {% else %}
+                    <span></span>
+                {% endif %}
+	
+	            {% if model.perms.add %}
+	                <span style="padding: 0 15px;"><a href="{{ model.admin_url }}add/" class="addlink">{% trans 'Add' %}</a></span>
+	            {% else %}
+	                <span></span>
+	            {% endif %}
+	            </div>
+	        {% endfor %}
+    {% endfor %}	        
+        </fieldset>
+        </div>
+
+{% else %}
+    <p>{% trans "You don't have permission to edit anything." %}</p>
+{% endif %}
+</div>
+{% endblock %}
+
+{% block sidebar %}
+<div id="content-related">
+    <div class="module" id="recent-actions-module">
+        <h2>{% trans 'Recent Actions' %}</h2>
+        <h3>{% trans 'My Actions' %}</h3>
+            {% load log %}
+            {% get_admin_log 10 as admin_log for_user user %}
+            {% if not admin_log %}
+            <p>{% trans 'None available' %}</p>
+            {% else %}
+            <ul class="actionlist">
+            {% for entry in admin_log %}
+            <li class="{% if entry.is_addition %}addlink{% endif %}{% if entry.is_change %}changelink{% endif %}{% if entry.is_deletion %}deletelink{% endif %}">
+                {% if entry.is_deletion or not entry.get_admin_url %}
+                    {{ entry.object_repr }}
+                {% else %}
+                    <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+                {% endif %}
+                <br/>
+                {% if entry.content_type %}
+                    <span class="mini quiet">{% filter capfirst %}{% trans entry.content_type.name %}{% endfilter %}</span>
+                {% else %}
+                    <span class="mini quiet">{% trans 'Unknown content' %}</span>
+                {% endif %}
+            </li>
+            {% endfor %}
+            </ul>
+            {% endif %}
+    </div>
+</div>
+{% endblock %}
