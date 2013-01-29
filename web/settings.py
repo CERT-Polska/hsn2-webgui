@@ -38,7 +38,7 @@ DATABASES = {
     }
 }
 
-COUCHDB_SERVER = 'http://192.168.0.2:5984'
+COUCHDB_SERVER = 'http://127.0.0.1:5984'
 COUCHDB_NAME = 'hsn'
 
 # Local time zone for this installation. Choices can be found here:
@@ -154,6 +154,7 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 HSN_CONF = os.path.join( os.path.dirname(__file__), 'hsn2.conf')
 COMMUNICATION_LIB = '/opt/hsn2/python/commlib'
+ALIASES_LIB = '/opt/hsn2/console'
 
 FILE_FEEDER_ID = 'feeder'
 FILE_FEEDER_PARAMETER_NAME = 'uri'

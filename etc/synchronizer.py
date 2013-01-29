@@ -32,6 +32,7 @@ os.environ["DJANGO_SETTINGS_MODULE"]="web.settings"
 from django.conf import settings
 
 sys.path.append(settings.COMMUNICATION_LIB)
+sys.path.append(settings.ALIASES_LIB)
 
 from daemon import Daemon
 from aliases import Aliases
