@@ -55,9 +55,7 @@ class Synchronizer (object):
         self.logger = None
         if os.path.exists(self.daemonArgs.log_file):
             logging.config.fileConfig(self.daemonArgs.log_file)
-            self.logger = logging.getLogger('framework')
-        else:
-            pass
+        self.logger = logging.getLogger('webgui')
 
     def syncWorkflows(self):
         workflowCommand = 'workflow'
