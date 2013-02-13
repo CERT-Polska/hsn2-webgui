@@ -30,6 +30,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 os.environ["DJANGO_SETTINGS_MODULE"]="web.settings"
 
 from django.conf import settings
+from django.db import transaction
 
 sys.path.append(settings.COMMUNICATION_LIB)
 sys.path.append(settings.ALIASES_LIB)
@@ -100,12 +101,7 @@ class SchedulerDaemon(Daemon):
 
         self.is_alive = False
 
-    def run(self):
-
-        # daemon loop
-        while True:
-
-            self.logger.debug('whop whop whop') # pulse
+    def do_actions(self):
             jobCommand = 'job'
 
             # SCHEDULER ACTION: update jobs with status Processing
@@ -118,7 +114,7 @@ class SchedulerDaemon(Daemon):
                         setattr(self.daemonArgs, jobCommand, 'list')
                         jobs_dict = self.sendFrameworkCommand(jobCommand)
                     except:
-                        continue
+                        return
                     finally:
                         self.daemonArgs.clean(jobCommand)
 
@@ -131,7 +127,7 @@ class SchedulerDaemon(Daemon):
                                 setattr(self.daemonArgs, 'gjd_id', processingJob.frameworkid)
                                 job_details = self.sendFrameworkCommand(jobCommand)
                             except:
-                                continue
+                                return
                             finally:
                                 self.daemonArgs.clean(jobCommand)
                                 self.daemonArgs.clean('gjd_id')
@@ -310,6 +306,17 @@ class SchedulerDaemon(Daemon):
 #                self.pingCountDown = self.pingCountDown - 1
 
             time.sleep(1)
+
+
+
+    def run(self):
+
+        # daemon loop
+        while True:
+            self.logger.debug('whop whop whop') # pulse
+            with transaction.commit_on_success():
+                self.do_actions()
+
 
     def sendFrameworkCommand(self, command):
 
