@@ -430,9 +430,9 @@ fieldset div:last-child {
 
 /************ classification / status *************/
 .benign *, .benign, .completed *, .completed { color: green !important; }
-.unknown *, .unknown, .unclassified *, .unclassified, .processing *, .processing { color: darkgrey !important; }
+.unknown *, .unknown, .unclassified *, .unclassified, .starting *, .starting, .processing *, .processing { color: darkgrey !important; }
 .suspicious *, .suspicious, .obfuscated *, .obfuscated, .cancelled *, .cancelled { color: orange !important; }
-.malicious *, .malicious, .aborted *, .aborted { color: red !important; }
+.malicious *, .malicious, .failed *, .failed, .cancelled *, .cancelled { color: red !important; }
 
 /******* AnalyzerData *******/
 #analyzedUrlDataWrapper { margin-top: 20px;}

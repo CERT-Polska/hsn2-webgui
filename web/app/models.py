@@ -17,8 +17,6 @@
 
 from django.db import models
 from django.contrib.auth.models import User
-from django.contrib.contenttypes import generic
-from django.conf import settings
 
 CLASSIFICATIONS = {
     'UNKNOWN': 1,
@@ -97,17 +95,25 @@ class ServiceParameter (models.Model):
         return '%s.%s=%s' % ( self.service, self.param_key, self.param_value )
 
 class Job (models.Model):
-
-    ABORTED_STATUS = 1
-    CANCELLED_STATUS = 2
+    
+    ACCEPTED_STATUS = 1 
+    STARTING_STATUS = 2
     PROCESSING_STATUS = 3
     COMPLETED_STATUS = 4
-
+    FAILING_STATUS = 5
+    FAILED_STATUS = 6
+    CANCELLING_STATUS = 7
+    CANCELLED_STATUS = 8
+  
     JOBSTATUS = (
-                    (ABORTED_STATUS, 'ABORTED'),
-                    (CANCELLED_STATUS, 'CANCELLED'),
+                    (ACCEPTED_STATUS, 'ACCEPTED'),
+                    (STARTING_STATUS, 'STARTING'),
                     (PROCESSING_STATUS, 'PROCESSING'),
-                    (COMPLETED_STATUS, 'COMPLETED')
+                    (COMPLETED_STATUS, 'COMPLETED'),
+                    (FAILING_STATUS, 'FAILING'),
+                    (FAILED_STATUS, 'FAILED'),
+                    (CANCELLING_STATUS, 'CANCELLING'),
+                    (CANCELLED_STATUS, 'CANCELLED')
                  )
 
     id = models.AutoField(primary_key=True)
