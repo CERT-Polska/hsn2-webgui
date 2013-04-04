@@ -310,10 +310,9 @@ class SchedulerDaemon(Daemon):
 
 
     def run(self):
-
+        self.logger.info('Started scheduler')
         # daemon loop
         while True:
-            self.logger.debug('whop whop whop') # pulse
             with transaction.commit_on_success():
                 self.do_actions()
 

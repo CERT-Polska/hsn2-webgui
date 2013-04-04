@@ -7,7 +7,33 @@
 {% endblock %}
 
 {% block content %}
-<p>
-    HoneySpider Network About page...
-</p>
+
+<fieldset>
+<legend>Honeyspider Network</legend>
+Honeyspider Network is a highly-scalable system integrating multiple <a href="http://en.wikipedia.org/wiki/Client_honeypot" target="_blank">client honeypots</a> to detect malicious websites.<br><br>
+The project is a joint venture between <a href="http://nask.pl/" target="_blank">NASK</a>/<a href="http://cert.pl/" target="_blank">CERT Polska</a> (Poland) and <a href="http://ncsc.nl/" target="_blank">National Cyber Security Centre</a> (Netherlands). Our goal is to develop a complete system based on existing state-of-the-art tools and client honeypot solutions including a novel crawler application specially tailored for the bulk processing of URLs.<br><br>
+The major incentive to start this project is the rapidly growing number of browser exploits involving varying degrees of user interaction. These types of attacks lie outside the scope of most current monitoring systems in use. Therefore, we view this new system as an expansion of our monitoring and early warning abilities. Ultimately, the system will improve situational awareness of what is happening on the Internet and improve security services offered by the parties to their constituents.<br><br>
+The system focuses primarily on attacks against, or involving the use of, web browsers. These include the detection of drive-by downloads and malicious binaries. Initially, the main area of exploration is drive-by downloads. Apart from identifying browser exploits (including 0-day attacks), the system is expected to automatically obtain and analyze the attacking malware.<br><br>
+On the <a href="http://www.honeyspider.org" target="_blank">website</a> you will be able to find all relevant information about Honeyspider Network - its architecture, <a href="http://www.honeyspider.org/wiki/Installation" target="_blank">installation</a> procedure and a <a href="http://www.honeyspider.org/wiki/Web-Interface" target="_blank">user manual</a> describing how to use it efficiently. The system consists of <a href="http://www.honeyspider.org/wiki/Services" target="_blank">multiple modules</a> for analysis and classification of live websites. Component-based architecture makes the system extendible, in particular adding <a href="http://www.honeyspider.org/wiki/New-Services" target="_blank">new detection modules</a> is relatively easy.<br><br>
+
+Questions and feedback can be posted to <a href="https://groups.google.com/d/forum/honeyspider-network-2" target="_blank">Honeyspider Network 2 Forum</a>. In case you do not have a Google account, please send an email to this <a href="mailto:honeyspider-network-2+subscribe@googlegroups.com?subject=Register%20to%20Honeyspider%20Network%202%20Group">address</a> to register the Honeyspider Network 2 forum.
+</fieldset>
+
+<fieldset>
+	<legend>Reporting Bugs</legend>
+Before making a bug report please check the <a href="http://www.honeyspider.org/Installation#Known-Problems" target="_blank">Known Problems</a> section on the website to see if this is a new bug. The report should be created via the issue tracker and include at least the following:<br><br>
+<ul>
+    <li class="bullet">Description of the problem.</li><br>
+    <li class="bullet">HSN 2.0 logs (which can be found in /var/log/hsn2 directory) compressed and archived as one file.</li><br>
+    <li class="bullet">Output of "job details" command (hc job details &lt;job_id&gt; - as described above).</li><br>
+    <li class="bullet">File (list of URLs) supplied to the feeder.</li><br>
+</ul><br>
+Please post bug reports on <a href="https://github.com/CERT-Polska" target="_blank">GitHub</a> in an appropriate project.	
+</fieldset>
+
+<fieldset>
+<legend>License</legend>
+Source code of Honeyspider Network 2 is released under the <a href="http://www.gnu.org/licenses/gpl-3.0.html" target="_blank">General Public License version 3.</a>
+</fieldset>    
+
 {% endblock %}
