@@ -677,7 +677,7 @@ def statistics_page(request):
     jobStatistics['cancelled'] = Job.objects.filter(status=Job.CANCELLED_STATUS).count()
     jobStatistics['failed'] = Job.objects.filter(status=Job.FAILED_STATUS).count()
     jobStatistics['processing'] = Job.objects.filter(status=Job.PROCESSING_STATUS).count()
-    jobStatistics['unknown'] = Job.objects.filter(status__gt=Job.COMPLETED_STATUS).count()
+    jobStatistics['unknown'] = Job.objects.filter(status__gt=Job.CANCELLED_STATUS).count()
 
     return render_response(request, 'statistics.html', \
                            {'statistics_selected': True, \
