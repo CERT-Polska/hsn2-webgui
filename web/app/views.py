@@ -17,6 +17,7 @@
 
 import os
 import re
+from itertools import chain
 
 try:
     import simplejson as json
@@ -26,7 +27,6 @@ except ImportError:
 import urllib
 from datetime import datetime, timedelta
 import calendar
-from ConfigParser import ConfigParser
 
 from couchdb.client import Server
 
@@ -57,7 +57,6 @@ from web.app.custom.shortcuts import render_response
 
 @login_required
 def new_job(request):
-    configParser = ConfigParser()
     tools = Tools()
 
     parameterGroupNumbers = []
@@ -344,8 +343,6 @@ def job_details(request, job_id):
     if not user.is_superuser and job.owner is not user and not job.is_public:
         return HttpResponseRedirect('/nopermission/')
 
-    tools = Tools()
-
     queryResultMessage = ""
 
     # select couchdb
@@ -361,7 +358,8 @@ def job_details(request, job_id):
 
     # query couchdb
     try:
-        for url in db.view('url_by_fwid/view', key=jobFrameworkId):
+        for url in chain( db.view('url_by_fwid/view', key=jobFrameworkId), 
+                          db.view('file_by_fwid/view', key=jobFrameworkId) ):
             topAncestor = url.value['top_ancestor']
             classification = url.value['classification'].upper()
 
@@ -370,7 +368,8 @@ def job_details(request, job_id):
 
                 # set the top ancestor url
                 if nodeId == url.value['id']:
-                    urls[topAncestor]['url'] = url.value['url']
+                    if url.value['url']:
+                        urls[topAncestor]['url'] = url.value['url']
                     urls[topAncestor]['node'] = url.value['id']
 
                 # set the overall classification for the url
@@ -378,7 +377,10 @@ def job_details(request, job_id):
                     urls[topAncestor]['classification'] = classification
 
             else:
-                urls[topAncestor] = {'classification': classification, 'url': url.value['url'], 'node': url.value['id']}
+                if url.value['url']:
+                    urls[topAncestor] = {'classification': classification, 'url': url.value['url'], 'node': url.value['id']}
+                else:
+                    urls[topAncestor] = {'classification': classification, 'node': url.value['id']}
 
     except Exception as e:
         queryResultMessage += "Cannot process query."
@@ -441,6 +443,19 @@ def analysis_overview(request, job_id, node):
             urls[result.value['id']] = {'url': result.value['url'], 'classification': 'UNKNOWN'}
     except Exception as e:
         queryResultMessage += "Cannot process query(2). "
+    
+    # add files to urls list
+    try:
+        for result in db.view('file_summary/view', key=searchValues, reduce='false' ):
+            nodes.append(result.value['id'])
+            possibleUrlId = '%s:%s' % ( job.frameworkid, result.value['parent'] )
+            if possibleUrlId in urls:
+                urls[result.value['id']] = {'url': 'FILE: %s' % urls[possibleUrlId]['url'], 'classification': 'UNKNOWN'}
+            else:
+                urls[result.value['id']] = {'url': 'FILE: %s' % result.value['id'], 'classification': 'UNKNOWN'}
+                
+    except Exception as e:
+        queryResultMessage += "Cannot process query(3). "
 
     analyzers = {}
     # create lists:
@@ -464,7 +479,7 @@ def analysis_overview(request, job_id, node):
                         urls[result.key]['classification'] = analysisClassification
 
     except Exception as e:
-        queryResultMessage += "Cannot process query(3). %s " % e
+        queryResultMessage += "Cannot process query(4). %s " % e
 
     return render_response(request, 'analysis_overview.html', \
                           {'jobs_selected': True, \
@@ -507,6 +522,11 @@ def analysis_by_analyzer(request, job_id, node, analyzer):
 
             if result.value['id'] == node:
                 topLevelUrl = result.value['url']
+
+        for result in db.view('file_summary/view', key=searchValues, reduce='false' ):
+            fileResult = { 'column1': 'FILE: %s' % result.value['id'] }
+            analysisNode = "%s:%s" % (result.value['id'], analyzer)
+            urls[analysisNode] = fileResult
 
         for result in db.view('analysis/by_id_classification', keys=urls.keys()):
             urlsByAnalyzer[result.id] = urls[result.id]
@@ -558,7 +578,7 @@ def analysis_by_url(request, job_id, node, subnode):
             analyzedUrlDetails = {}
             queryResultMessage += 'Could retrieve parent url info. '
 
-        analyzedUrl = analyzedUrlDetails['url_original'] if 'url_original' in analyzedUrlDetails else ''
+        analyzedUrl = analyzedUrlDetails['url_original'] if 'url_original' in analyzedUrlDetails else 'FILE: %s' % subnode
 
         try:
             for result in db.view('analysis/by_node', key=subnode ):
