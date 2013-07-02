@@ -19,7 +19,6 @@
 
 import sys
 import os
-import time
 import textwrap
 import logging.config
 
@@ -41,9 +40,12 @@ from hsn2bus import Bus
 from hsn2bus import BusException
 from hsn2bus import BusTimeoutException
 from hsn2cmd import CommandDispatcher, CommandDispatcherMessage
+from Jobs_pb2 import JobFinished
 
 from web.app.models import Schedule, Job
 from web.app.tools import ConfigParser, datetime
+
+from apscheduler.scheduler import Scheduler
 
 class WorkflowNotDeployedException(Exception):
     pass
@@ -96,8 +98,9 @@ class SchedulerDaemon(Daemon):
 
         self.pingInterval = int(self.config.get("scheduler", "ping_interval")) or 20
         self.pingCountDown = 0
-        self.jobListInterval = int(self.config.get("scheduler", "joblist_interval")) or 20
-        self.jobListCountDown = self.jobListInterval
+
+        self.jobSubmitInterval = int(self.config.get("scheduler", "jobsubmit_interval")) or 10
+        self.jobCleanupInterval = int(self.config.get("scheduler", "jobcleanup_interval")) or 30
 
         self.is_alive = False
     
@@ -264,41 +267,37 @@ class SchedulerDaemon(Daemon):
         jobCommand = 'job'
         processingJobs = Job.objects.filter(status=Job.PROCESSING_STATUS)
         if len(list(processingJobs)) != 0:
-            if self.jobListCountDown == 0:
-                self.jobListCountDown = self.jobListInterval
-                jobs_dict = {}
-                try:
-                    setattr(self.daemonArgs, jobCommand, 'list')
-                    jobs_dict = self.sendFrameworkCommand(jobCommand)
-                except:
-                    return
-                finally:
-                    self.daemonArgs.clean(jobCommand)
+            jobs_dict = {}
+            try:
+                setattr(self.daemonArgs, jobCommand, 'list')
+                jobs_dict = self.sendFrameworkCommand(jobCommand)
+            except:
+                return
+            finally:
+                self.daemonArgs.clean(jobCommand)
 
-                for processingJob in processingJobs:
-                    if processingJob.frameworkid in jobs_dict \
-                    and int(processingJob.status) != int(jobs_dict[processingJob.frameworkid]):
+            for processingJob in processingJobs:
+                if processingJob.frameworkid in jobs_dict \
+                and int(processingJob.status) != int(jobs_dict[processingJob.frameworkid]):
+                    
+                    try:
+                        setattr(self.daemonArgs, jobCommand, 'details')
+                        setattr(self.daemonArgs, 'gjd_id', processingJob.frameworkid)
+                        job_details = self.sendFrameworkCommand(jobCommand)
+                    except:
+                        continue
+                    finally:
+                        self.daemonArgs.clean(jobCommand)
+                        self.daemonArgs.clean('gjd_id')
                         
-                        try:
-                            setattr(self.daemonArgs, jobCommand, 'details')
-                            setattr(self.daemonArgs, 'gjd_id', processingJob.frameworkid)
-                            job_details = self.sendFrameworkCommand(jobCommand)
-                        except:
-                            continue
-                        finally:
-                            self.daemonArgs.clean(jobCommand)
-                            self.daemonArgs.clean('gjd_id')
-                            
-                        processingJob.status = jobs_dict[processingJob.frameworkid]
-                        processingJob.finished = job_details['job_end_time']
-                        processingJob.save()
-                    elif processingJob.frameworkid not in jobs_dict:
-                        processingJob.status = Job.COMPLETED_STATUS
-                        processingJob.finished = None
-                        processingJob.save()
-                self.pingCountDown = self.pingInterval
-            else:
-                self.jobListCountDown = self.jobListCountDown - 1
+                    processingJob.status = jobs_dict[processingJob.frameworkid]
+                    processingJob.finished = job_details['job_end_time']
+                    processingJob.save()
+                elif processingJob.frameworkid not in jobs_dict:
+                    processingJob.status = Job.COMPLETED_STATUS
+                    processingJob.finished = None
+                    processingJob.save()
+            self.pingCountDown = self.pingInterval
 
     # Every Xth iteration check if framework is alive with ping command
 #     def isFrameworkAlive(self):
@@ -314,25 +313,68 @@ class SchedulerDaemon(Daemon):
 #         else:
 #             self.pingCountDown = self.pingCountDown - 1
 
+    def checkJobs(self):
+        try:
+            self.submitJobsToFramework()
+        except Exception as e:
+            self.logger.error("Unknown error while submitting jobs to framework: %s" % str(e))
+            raise Exception
+
+    def cleanup(self):
+        try:
+            self.updateProcessingJobs()
+        except Exception as e:
+            self.logger.error("Unknown error while updating processing jobs: %s" % str(e))
+            raise Exception
+        
+    def onNotification(self, eventType, body):
+        if eventType == 'JobFinished':
+            event = JobFinished()
+            event.ParseFromString(body)
+            self.logger.debug('Job with ID %s is finished with status %s', str(event.job), str(event.status))
+            finishedJob = Job.objects.get(frameworkid = event.job)
+            finishedJob.status = event.status
+            finishedJob.finished = datetime.now()
+            finishedJob.save()
+        return True
+        
     def run(self):
         self.logger.info('Started scheduler')
-        # daemon loop
-        while True:
-            self.updateProcessingJobs()
-            self.submitJobsToFramework()
-#             self.isFrameworkAlive()
-            time.sleep(1)
+
+        # initialize scheduler
+        try:
+            scheduler = Scheduler(daemonic=True)
+            scheduler.add_interval_job(self.checkJobs, seconds=self.jobSubmitInterval)
+            scheduler.add_interval_job(self.cleanup, minutes=self.jobCleanupInterval)
+            scheduler.start()
+        except Exception as e:
+            self.logger.error("Unknown error while initializing scheduler: %s" % str(e))
+            raise Exception
+
+        # initialize bus instance for receiving job notifications
+        try:
+            notificationBus = Bus.createConfigurableBus(self.logger, self.config, 'notifications')
+            notificationBus.openFwChannel()
+            notificationBus.attachToMonitoring(self.onNotification)
+            notificationBus.close()
+        except BusException, e:
+            self.logger.error("Cannot connect to HSN2 Bus because '%s'" % e)
+            raise Exception
+        except BusTimeoutException, e:
+            self.logger.error("Response timeout")
+            raise Exception
+        except Exception as e:
+            self.logger.error("Unknown error: %s" % str(e))
+            raise Exception
 
     def sendFrameworkCommand(self, command):
-
         frameworkResponse = None
         aliases = Aliases()
         try:
-#            fwkBus = Bus.createConfigurableBus(self.logger, self.config, 'webgui-scheduler')
             fwkBus = Bus.createConfigurableBus(self.logger, self.config, 'cli')
             fwkBus.openFwChannel()
-            disp = CommandDispatcher(fwkBus, self.logger, self.daemonArgs, self.config, False)
-            frameworkResponse = disp.dispatch(command, aliases)
+            dispatcher = CommandDispatcher(fwkBus, self.logger, self.daemonArgs, self.config, False)
+            frameworkResponse = dispatcher.dispatch(command, aliases)
         except BusException, e:
             self.logger.error("Cannot connect to HSN2 Bus because '%s'" % e)
             raise Exception
