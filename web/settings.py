@@ -159,6 +159,8 @@ ALIASES_LIB = '/opt/hsn2/console'
 FILE_FEEDER_ID = 'feeder'
 FILE_FEEDER_PARAMETER_NAME = 'uri'
 
+FEEDS_HISTORY_DAYS = 5
+
 # A sample logging configuration. The only tangible logging
 # performed by this configuration is to send an email to
 # the site admins on every HTTP 500 error.

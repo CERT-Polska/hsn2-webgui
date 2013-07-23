@@ -14,13 +14,13 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+import re
 from django.conf import settings
 from django.contrib.syndication.views import Feed
 from django.shortcuts import get_object_or_404
 from django.utils.datastructures import SortedDict
 from couchdb.client import Server
-
+from datetime import datetime, timedelta
 from web.app.models import *
 
 
@@ -54,12 +54,12 @@ class JobFeed(Feed):
             pass
 
         urls = {}
+        
+        daysAgo = settings.FEEDS_HISTORY_DAYS if re.match(r'^\d+$', '%s' % settings.FEEDS_HISTORY_DAYS) else 7
 
-        jobs = Job.objects.filter(schedule=scheduledJob).order_by('started')
-
-        for job in jobs:
+        for job in Job.objects.filter(schedule=scheduledJob, started__gte = datetime.now() - timedelta(days=daysAgo)):
             if job.frameworkid:
-                jobFrameworkId = "%s" % job.frameworkid
+                jobFrameworkId = job.frameworkid
                 sortingKeyDate = job.started.strftime('%Y%m%d%H%M%S')
 
                 for url in db.view('url_by_fwid/view', key=jobFrameworkId):
@@ -88,14 +88,13 @@ class JobFeed(Feed):
                                         'pageCount': 1, \
                                         'jobId': job.id, \
                                         'started': job.started}
+        
+        sortedUrls = SortedDict()
+        for key in sorted(urls.iterkeys(), reverse=True):
+            sortedUrls[key] = urls[key]
 
-            sortedUrls = SortedDict()
-            for key in sorted(urls.iterkeys(), reverse=True):
-                sortedUrls[key] = urls[key]
-
-            return sortedUrls.values()
-        else:
-            return []
+        return sortedUrls.values()
+    
 
 
 class AllUrls(JobFeed):
