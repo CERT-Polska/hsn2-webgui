@@ -1,0 +1,19 @@
+Wed Sep 5 2013
+
+Upgrade contains:
+- scheduling mechanism now supports two types of scheduling: 'cron-like' scheduling and a 'run once' scheduling
+- added 'origin' column to table of job urls
+- added simple job filter
+- bugfix: edit of starttime of job is ignored
+- added Couchdb cleanup script  
+
+New scheduling mechanism demands some database changes and two additional python packages.
+These changes are only needed when UPGRADING the hsn2-webgui!
+
+install python packages:
+pip install APScheduler
+pip install croniter
+
+update database by running UPGRADE_05092013.sql in MySQL.
+Example:
+mysql -u hsn2 -p -h localhost hsn2 < UPGRADE_05092013.sql 
