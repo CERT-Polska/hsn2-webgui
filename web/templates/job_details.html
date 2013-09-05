@@ -44,13 +44,9 @@
         <span class="label">
             <a href="/schedule/{{ job.schedule.id }}/">
 	            {% if job.schedule.scheduled_start %}
-	            	{% if job.schedule.frequency <= 4 %}
-		                {{ job.schedule.get_frequency_display }} at {{ job.schedule.scheduled_start|date:"H:i" }}
-	                {% else %}
-		                {{ job.schedule.get_frequency_display }}
-                	{% endif %}
+	            	Once at {{ job.schedule.scheduled_start|date:"H:i" }}
 	            {% else %}
-	            As Soon As Possible
+	            	{{ job.schedule.cron_expression }}
 	            {% endif %}                
             </a>
         </span>
@@ -100,13 +96,12 @@
     <thead>
         <tr>
             <th class="pointer">URL</th>            
-            <th class="pointer">Status</th>
+            <th class="pointer" style="min-width: 120px;">Classification</th>
         </tr>
     </thead>
     <tbody>
     {% for topAncestor, url in urls.items %}
         <tr>
-<!--            <td><a href="/job/{{ job.id }}/analysis/{{ url.node|split:":"|slice:"1:2"|first }}/">{{ url.url }}</a></td>-->
             <td><a href="/job/{{ job.id }}/analysis/{{ url.node }}/">{{ url.url }}</a></td>
             <td><span class="{{ url.classification|lower }} bold">{{ url.classification|upper }}</span></td>            
         </tr>

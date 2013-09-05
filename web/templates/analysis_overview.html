@@ -78,15 +78,17 @@
 <table class="tbl_dataTables" id="tbl_urls">
     <thead>
         <tr>
-            <th class="pointer">Visited URLs</th>            
+            <th class="pointer" style="max-width: 600px">Visited URLs</th>
+			<th class="pointer" style="min-width: 80px">Origin</th>
             <th class="pointer" style="min-width: 120px">Classification</th>
         </tr>
     </thead>
     <tbody >
 {% for subnode, details in urls.items %}
         <tr>
-            <td><a href="/job/{{ job.id }}/analysis/{{ node }}/byurl/{{ subnode }}/" id="{{ subnode }}" class="analyzedUrl">{{ details.url }}</a></td>
-            <td><span class="{{ details.classification|lower }} bold">{{ details.classification|upper }}</span></td>            
+            <td class="break-word" style="max-width: 600px"><a href="/job/{{ job.id }}/analysis/{{ node }}/byurl/{{ subnode }}/" id="{{ subnode }}" class="analyzedUrl">{{ details.url }}</a></td>
+            <td><span class="">{{ details.origin|upper }}</span></td>
+            <td><span class="{{ details.classification|lower }} bold">{{ details.classification|upper }}</span></td>
         </tr>
 {% endfor %}
     </tbody>

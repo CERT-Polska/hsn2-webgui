@@ -88,18 +88,20 @@ $( function () {
 	// show/hide scheduling options
 	$('input[name="schedule_when"]').change( function () {
 		
-		if ( $('#id_schedule_when_1').is(':checked') ) {
-			$('#span_scheduling_options').css('color', 'grey');
-			$('#div_scheduling_options').slideDown();
+		if ( $('#id_schedule_when_0').is(':checked') ) {
+			$('#div_scheduling_options_once').show();
+			$('#div_scheduling_options_cron').hide();
 		} else {
-			$('#div_scheduling_options').slideUp();
-			$('#span_scheduling_options').css('color', 'lightgrey');
+			$('#div_scheduling_options_once').hide();
+			$('#div_scheduling_options_cron').show();
 		}
 	});
 	
 	//trigger initial scheduling options state
-	if ( $('#id_schedule_when_1').is(':checked') ) {
-		$('#div_scheduling_options').show();
+	if ( $('#id_schedule_when_0').is(':checked') ) {
+		$('#div_scheduling_options_once').show();
+	} else {
+		$('#div_scheduling_options_cron').show();
 	}
 	
 	// save job

@@ -7,7 +7,8 @@ function(doc) {
 				{ 
 					classification: doc.classification,
 					id: doc._id,
-					parent: doc.parent
+					parent: doc.parent,
+					origin: doc.origin
 				}
 			);
     } 

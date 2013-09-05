@@ -12,7 +12,13 @@
 {% endblock %}
 
 {% block content %}
-
+<div class="dataTables_filter" id="jobSearchWrapper">
+	<form method="post" action="." id="job_search_form">{% csrf_token %}
+		<label for="jobSearchJobName">Search by job name: </label>
+		{{ jobSearchForm.job_search }}
+		<input type="submit" class="gradient" id="btn_search" value="Search">
+	</form>
+</div>
 <table class="tbl_overview">
     <thead>
         <tr class="topdowngradient">
@@ -34,13 +40,9 @@
             <td class="nowrap">
                 <a href="/schedule/{{ job.schedule.id }}/">
 	            {% if job.schedule.scheduled_start %}
-	            	{% if job.schedule.frequency <= 4 %}
-		                {{ job.schedule.get_frequency_display }} at {{ job.schedule.scheduled_start|date:"H:i" }}
-	                {% else %}
-		                {{ job.schedule.get_frequency_display }}
-                	{% endif %}
+		            Once at {{ job.schedule.scheduled_start|date:"H:i" }}
 	            {% else %}
-	            As Soon As Possible
+					{{ job.schedule.cron_expression }}
 	            {% endif %}                
                 </a>
             </td>            

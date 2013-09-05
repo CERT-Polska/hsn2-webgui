@@ -44,36 +44,32 @@ class Workflow (models.Model):
 
 class Schedule (models.Model):
 
-    ONCE_FREQUENCY = 1
-    DAILY_FREQUENCY = 2
-    WEEKLY_FREQUENCY = 3
-    MONTHLY_FREQUENCY = 4
-    HOURLY_FREQUENCY = 5
-    HALF_HOURLY_FREQUENCY = 6
-
-    SCHEDULE_FREQUENCY = (
-                            (ONCE_FREQUENCY, 'Once'),
-                            (HALF_HOURLY_FREQUENCY, 'Half Hourly'),
-                            (HOURLY_FREQUENCY, 'Hourly'),
-                            (DAILY_FREQUENCY, 'Daily'),
-                            (WEEKLY_FREQUENCY, 'Weekly'),
-                            (MONTHLY_FREQUENCY, 'Monthly')
-                         )
+    NEW_STATUS = 1
+    UPDATE_STATUS = 2
+    ACTIVE_STATUS = 3
+    DEACTIVATE_STATUS = 4
+    DELETED_STATUS = 5
+    DELETE_STATUS = 6
+    DEACTIVATED_STATUS = 7
+    
+    SCHEDULE_STATUS = (
+                            (NEW_STATUS, 'Adding'),
+                            (UPDATE_STATUS, 'Updating'),
+                            (ACTIVE_STATUS, 'Active'),
+                            (DEACTIVATE_STATUS, 'Deactivating'),
+                            (DEACTIVATED_STATUS, 'Deactivated'),
+                            (DELETED_STATUS, 'Deleted'),
+                            (DELETE_STATUS, 'Deleting')
+                       )
 
     id = models.AutoField(primary_key=True)
     created_by = models.ForeignKey(User)
     job_name = models.CharField(max_length=250)
+    scheduled_start = models.DateTimeField(null=True)
     workflow = models.ForeignKey(Workflow, null=True, related_name='schedule')
     is_public = models.BooleanField(default=False)
-    is_enabled = models.BooleanField(default=True)
-    is_deleted = models.BooleanField(default=False)
-    scheduled_start = models.DateTimeField(null=True)
-    frequency = models.IntegerField(choices=SCHEDULE_FREQUENCY)
-    last_submit = models.DateTimeField(null=True)
-    last_scheduled = models.DateTimeField(null=True)
-
-    def get_frequency_display(self):
-        pass
+    status = models.IntegerField(choices=SCHEDULE_STATUS)
+    cron_expression = models.CharField(max_length=150, null=True)
 
     def __unicode__(self):
         return self.job_name

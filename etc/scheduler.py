@@ -19,10 +19,12 @@
 
 import sys
 import os
-import textwrap
+import re
+import time
+import itertools
 import logging.config
+from croniter import croniter
 
-from dateutil.rrule import rrule, MINUTELY, HOURLY, DAILY, WEEKLY, MONTHLY
 from paramiko import SSHException, PasswordRequiredException, SFTPClient, Transport, RSAKey, DSSKey
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
@@ -30,6 +32,7 @@ os.environ["DJANGO_SETTINGS_MODULE"]="web.settings"
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 
 sys.path.append(settings.COMMUNICATION_LIB)
 sys.path.append(settings.ALIASES_LIB)
@@ -57,30 +60,13 @@ class SchedulerDaemon(Daemon):
         self.config = config
 
         # set DaemonArgs for CommandDispatcher
-        self.daemonArgs = DaemonArgs(config)
+        daemonArgs = DaemonArgs(config)
 
         # setup logger
         self.logger = None
-        if os.path.exists(self.daemonArgs.log_file):
-            logging.config.fileConfig(self.daemonArgs.log_file)
+        if os.path.exists(daemonArgs.log_file):
+            logging.config.fileConfig(daemonArgs.log_file)
             self.logger = logging.getLogger('framework')
-        else:
-            pass
-
-        self.selectScheduledJobsSQL = textwrap.dedent("""
-            SELECT * FROM app_schedule
-            WHERE (
-                   last_submit IS NULL
-                OR ( frequency = %s AND ( NOW() > ADDTIME(last_scheduled, '00:30:00') OR last_scheduled IS NULL ) )
-                OR ( frequency = %s AND ( NOW() > ADDTIME(last_scheduled, '01:00:00') OR last_scheduled IS NULL ) )
-                OR ( frequency = %s AND ( NOW() > ADDTIME(last_scheduled, '24:00:00') OR last_scheduled IS NULL ) )
-                OR ( frequency = %s AND ( NOW() > ADDTIME(last_scheduled, '7 00:00:00') OR last_scheduled IS NULL )  )
-                OR ( frequency = %s AND ( NOW() > DATE_ADD(last_scheduled, INTERVAL 1 MONTH) OR last_scheduled IS NULL ) )
-            )
-            AND ( scheduled_start IS NULL OR scheduled_start < NOW() )
-            AND is_enabled = TRUE
-            ORDER BY frequency, last_scheduled""" % \
-            (Schedule.HALF_HOURLY_FREQUENCY, Schedule.HOURLY_FREQUENCY, Schedule.DAILY_FREQUENCY, Schedule.WEEKLY_FREQUENCY, Schedule.MONTHLY_FREQUENCY))
 
         # sftp settings
         self.sftpHost = self.config.get("sftp", "host")
@@ -96,13 +82,11 @@ class SchedulerDaemon(Daemon):
             and self.sftpPrivateKeyType.lower() != 'dss':
             self.sftpPrivateKeyType = None
 
-        self.pingInterval = int(self.config.get("scheduler", "ping_interval")) or 20
-        self.pingCountDown = 0
-
         self.jobSubmitInterval = int(self.config.get("scheduler", "jobsubmit_interval")) or 10
         self.jobCleanupInterval = int(self.config.get("scheduler", "jobcleanup_interval")) or 30
-
-        self.is_alive = False
+        
+        self.scheduler = Scheduler(daemonic=True)
+        self.cronScheduleSequence = ('minute', 'hour', 'day', 'month', 'day_of_week')
     
     @transaction.commit_on_success
     def saveJob(self, status, frameworkJobId, scheduledJob):
@@ -129,166 +113,140 @@ class SchedulerDaemon(Daemon):
                         schedule = scheduledJob,
                         status = status
                         )
-                
         newJob.save()
-            
-        # update schedule
-        scheduledJob.last_submit = now
-
-        calcFromDate = scheduledJob.last_scheduled if scheduledJob.last_scheduled \
-            else scheduledJob.scheduled_start if scheduledJob.scheduled_start \
-            else None
-
-        if calcFromDate:
-            if scheduledJob.frequency == Schedule.HALF_HOURLY_FREQUENCY:
-                scheduledJob.last_scheduled = rrule(MINUTELY, calcFromDate, interval=30).before(now, True)
-            if scheduledJob.frequency == Schedule.HOURLY_FREQUENCY:
-                scheduledJob.last_scheduled = rrule(HOURLY, calcFromDate).before(now, True)
-            if scheduledJob.frequency == Schedule.DAILY_FREQUENCY:
-                scheduledJob.last_scheduled = rrule(DAILY, calcFromDate).before(now, True)
-            elif scheduledJob.frequency == Schedule.WEEKLY_FREQUENCY:
-                scheduledJob.last_scheduled = rrule(WEEKLY, calcFromDate).before(now, True)
-            elif scheduledJob.frequency == Schedule.MONTHLY_FREQUENCY:
-                scheduledJob.last_scheduled = rrule(MONTHLY, calcFromDate).before(now, True)
-
-        scheduledJob.save()
 
     @transaction.commit_on_success
-    def submitJobsToFramework(self):
+    def submitJobToFramework(self, **kwargs):
         jobCommand = 'job'
-        scheduledJobs = Schedule.objects.raw(self.selectScheduledJobsSQL)
         
-        if len(list(scheduledJobs)) != 0:
-            self.daemonArgs.command = jobCommand
+        daemonArgs = DaemonArgs(self.config)
+        daemonArgs.command = jobCommand
+        unScheduledJob = kwargs['unScheduledJob']
+        
+        is_fileFeeder = False
+        fileFeederUploadedFile = None
+        del daemonArgs.param[:]
 
-            self.logger.debug("%s jobs to submit..." % len(list(scheduledJobs)))
+        # go through all parameters
+        for parameter in unScheduledJob.parameters.all():
 
-            for scheduledJob in scheduledJobs:
-                self.logger.debug("job: %s" % scheduledJob.job_name )
-                is_fileFeeder = False
-                fileFeederUploadedFile = None
-                del self.daemonArgs.param[:]
+            # add parameter to daemonArgs.param
+            if parameter.service and parameter.param_key and parameter.param_value:
 
-                # go through all parameters
-                for parameter in scheduledJob.parameters.all():
+                # check if a file feeder is used
+                if parameter.service == settings.FILE_FEEDER_ID:
+                    is_fileFeeder = True
+                    fileFeederUploadedFile = parameter.param_value
 
-                    # add parameter to self.daemonArgs.param
-                    if parameter.service and parameter.param_key and parameter.param_value:
+                    remoteFeederFile = os.path.join(self.sftpRemotePath, parameter.param_value)
+                    parameterString = '%s.%s=%s' % ( parameter.service, parameter.param_key, remoteFeederFile )
+                else:
+                    parameterString = '%s.%s=%s' % ( parameter.service, parameter.param_key, parameter.param_value )
 
-                        # check if a file feeder is used
-                        if parameter.service == settings.FILE_FEEDER_ID:
-                            is_fileFeeder = True
-                            fileFeederUploadedFile = parameter.param_value
+                self.logger.debug("add parameter string: %s" % parameterString)
+                daemonArgs.param.append([parameterString])
 
-                            remoteFeederFile = os.path.join(self.sftpRemotePath, parameter.param_value)
-                            parameterString = '%s.%s=%s' % ( parameter.service, parameter.param_key, remoteFeederFile )
-                        else:
-                            parameterString = '%s.%s=%s' % ( parameter.service, parameter.param_key, parameter.param_value )
+        # in case of a filefeeder upload file to framework server
+        if is_fileFeeder:
+            self.logger.debug("is file feeder")
+            sftp = None
+            transport = None
+            try:
+                transport = Transport((self.sftpHost, self.sftpPort))
+                if self.sftpPassword:
+                    transport.connect(username=self.sftpUsername, password=self.sftpPassword)
+                else:
+                    privateKey = None
+                    if self.sftpPrivateKeyType and self.sftpPrivateKeyType.lower() == 'rsa':
+                        privateKey = RSAKey.from_private_key_file(self.sftpPrivateKey, password=self.sftpPrivateKeyPassword )
+                    if self.sftpPrivateKeyType and self.sftpPrivateKeyType.lower() == 'dss':
+                        privateKey = DSSKey.from_private_key_file(self.sftpPrivateKey, password=self.sftpPrivateKeyPassword )
 
-                        self.logger.debug("add parameter string: %s" % parameterString)
-                        self.daemonArgs.param.append([parameterString])
+                    transport.connect(username=self.sftpUsername, pkey=privateKey)
 
-                # in case of a filefeeder upload file to framework server
-                if is_fileFeeder:
-                    self.logger.debug("is file feeder")
-                    sftp = None
-                    transport = None
-                    try:
-                        transport = Transport((self.sftpHost, self.sftpPort))
-                        if self.sftpPassword:
-                            transport.connect(username=self.sftpUsername, password=self.sftpPassword)
-                        else:
-                            privateKey = None
-                            if self.sftpPrivateKeyType and self.sftpPrivateKeyType.lower() == 'rsa':
-                                privateKey = RSAKey.from_private_key_file(self.sftpPrivateKey, password=self.sftpPrivateKeyPassword )
-                            if self.sftpPrivateKeyType and self.sftpPrivateKeyType.lower() == 'dss':
-                                privateKey = DSSKey.from_private_key_file(self.sftpPrivateKey, password=self.sftpPrivateKeyPassword )
+                sftp = SFTPClient.from_transport(transport)
 
-                            transport.connect(username=self.sftpUsername, pkey=privateKey)
+                filePath = os.path.join( settings.MEDIA_ROOT, fileFeederUploadedFile )
+                remotePath = os.path.join( self.sftpRemotePath, fileFeederUploadedFile )
 
-                        sftp = SFTPClient.from_transport(transport)
+                self.logger.debug("uploading file from %s to %s on remote machine" % (filePath, remotePath))
 
-                        filePath = os.path.join( settings.MEDIA_ROOT, fileFeederUploadedFile )
-                        remotePath = os.path.join( self.sftpRemotePath, fileFeederUploadedFile )
-
-                        self.logger.debug("uploading file from %s to %s on remote machine" % (filePath, remotePath))
-
-                        sftp.put(filePath, remotePath)
+                sftp.put(filePath, remotePath)
 #                            sftp.put(filePath, remotePath, confirm=False)
-                        sftp.chmod( remotePath, 0644 )
+                sftp.chmod( remotePath, 0644 )
 
-                        self.logger.debug("put OK")
+                self.logger.debug("put OK")
 
-                    except IOError as e:
-                        self.logger.error("IOError: %s. Will continue with next scheduled job." % e)
-                        self.saveJob(Job.FAILED_STATUS, None, scheduledJob)
-                        continue
-                    except PasswordRequiredException as e:
-                        self.logger.error("PasswordRequiredException: %s. Will continue with next scheduled job." % e)
-                        self.saveJob(Job.FAILED_STATUS, None, scheduledJob)
-                        continue
-                    except SSHException as e:
-                        self.logger.error("SSH Exception: %s. Will continue with next scheduled job." % e)
-                        self.saveJob(Job.FAILED_STATUS, None, scheduledJob)
-                        continue
-                    except Exception as e:
-                        self.logger.error("Unkown SFTP problem. Will continue with next scheduled job. %s" % e)
-                        self.saveJob(Job.FAILED_STATUS, None, scheduledJob)
-                        continue
-                    finally:
-                        if sftp is not None:
-                            sftp.close()
-                        if transport is not None:
-                            transport.close()
-                        
-                # set job workflow
-                self.daemonArgs.jd_workflow = scheduledJob.workflow.name
-
-                frameworkJobId = None
+            except IOError as e:
+                self.logger.error("IOError: %s. Will continue with next scheduled job." % e)
+                self.saveJob(Job.FAILED_STATUS, None, unScheduledJob)
+            except PasswordRequiredException as e:
+                self.logger.error("PasswordRequiredException: %s. Will continue with next scheduled job." % e)
+                self.saveJob(Job.FAILED_STATUS, None, unScheduledJob)
+            except SSHException as e:
+                self.logger.error("SSH Exception: %s. Will continue with next scheduled job." % e)
+                self.saveJob(Job.FAILED_STATUS, None, unScheduledJob)
+            except Exception as e:
+                self.logger.error("Unkown SFTP problem. Will continue with next scheduled job. %s" % e)
+                self.saveJob(Job.FAILED_STATUS, None, unScheduledJob)
+            finally:
+                if sftp is not None:
+                    sftp.close()
+                if transport is not None:
+                    transport.close()
                 
-                try:
-                    setattr(self.daemonArgs, jobCommand, 'submit')
-                    frameworkJobId = self.sendFrameworkCommand(jobCommand)
-                except WorkflowNotDeployedException:
-                    # The workflow is not deployed in the framework. To prevent the scheduler retrying continuously
-                    # we disable this job
-                    scheduledJob.is_enabled = False
-                    scheduledJob.save()
-                    continue
-                except:
-                    self.saveJob(Job.FAILED_STATUS, None, scheduledJob)
-                    continue
-                finally:
-                    self.daemonArgs.clean(jobCommand)
-                
-                self.saveJob(Job.PROCESSING_STATUS, frameworkJobId, scheduledJob)
-            
+        # set job workflow
+        daemonArgs.jd_workflow = unScheduledJob.workflow.name
+
+        frameworkJobId = None
+        
+        try:
+            setattr(daemonArgs, jobCommand, 'submit')
+            frameworkJobId = self.sendFrameworkCommand(jobCommand, daemonArgs)
+            self.saveJob(Job.PROCESSING_STATUS, frameworkJobId, unScheduledJob)
+        except WorkflowNotDeployedException:
+            # The workflow is not deployed in the framework. To prevent the scheduler retrying continuously
+            # we disable this job
+            unScheduledJob.status = Schedule.DEACTIVATE_STATUS
+            unScheduledJob.save()
+        except:
+            self.saveJob(Job.FAILED_STATUS, None, unScheduledJob)
+        finally:
+            daemonArgs.clean(jobCommand)
+        
+        if unScheduledJob.scheduled_start is not None:
+            unScheduledJob.status = Schedule.DEACTIVATED_STATUS
+            unScheduledJob.save()
+        
     def updateProcessingJobs(self):
         jobCommand = 'job'
         processingJobs = Job.objects.filter(status=Job.PROCESSING_STATUS)
+        
+        daemonArgs = DaemonArgs(self.config)
+        
         if len(list(processingJobs)) != 0:
             jobs_dict = {}
             try:
-                setattr(self.daemonArgs, jobCommand, 'list')
-                jobs_dict = self.sendFrameworkCommand(jobCommand)
+                setattr(daemonArgs, jobCommand, 'list')
+                jobs_dict = self.sendFrameworkCommand(jobCommand, daemonArgs)
             except:
                 return
             finally:
-                self.daemonArgs.clean(jobCommand)
+                daemonArgs.clean(jobCommand)
 
             for processingJob in processingJobs:
                 if processingJob.frameworkid in jobs_dict \
                 and int(processingJob.status) != int(jobs_dict[processingJob.frameworkid]):
                     
                     try:
-                        setattr(self.daemonArgs, jobCommand, 'details')
-                        setattr(self.daemonArgs, 'gjd_id', processingJob.frameworkid)
-                        job_details = self.sendFrameworkCommand(jobCommand)
+                        setattr(daemonArgs, jobCommand, 'details')
+                        setattr(daemonArgs, 'gjd_id', processingJob.frameworkid)
+                        job_details = self.sendFrameworkCommand(jobCommand, daemonArgs)
                     except:
                         continue
                     finally:
-                        self.daemonArgs.clean(jobCommand)
-                        self.daemonArgs.clean('gjd_id')
+                        daemonArgs.clean(jobCommand)
+                        daemonArgs.clean('gjd_id')
                         
                     processingJob.status = jobs_dict[processingJob.frameworkid]
                     processingJob.finished = job_details['job_end_time']
@@ -297,29 +255,62 @@ class SchedulerDaemon(Daemon):
                     processingJob.status = Job.COMPLETED_STATUS
                     processingJob.finished = None
                     processingJob.save()
-            self.pingCountDown = self.pingInterval
-
-    # Every Xth iteration check if framework is alive with ping command
-#     def isFrameworkAlive(self):
-#         self.pingCountDown = self.pingInterval
-#         if self.pingCountDown == 0 or self.jobListCountDown == 0:
-#             self.pingCountDown = self.pingInterval
-#             try:
-#                 self.is_alive = self.sendFrameworkCommand('ping')
-#             except:
-#                 continue
-# 
-#             self.logger.debug("Framework is alive: %s" % self.is_alive)
-#         else:
-#             self.pingCountDown = self.pingCountDown - 1
 
     def checkJobs(self):
-        try:
-            self.submitJobsToFramework()
-        except Exception as e:
-            self.logger.error("Unknown error while submitting jobs to framework: %s" % str(e))
-            raise Exception
+        scheduledJobs = self.scheduler.get_jobs()
+        
+        # remove scheduled jobs which are set to be deleted or deactivated
+        deleteAndDeactivateJobs = Schedule.objects.filter( Q(status=Schedule.DELETE_STATUS) | Q(status=Schedule.DEACTIVATE_STATUS) )
+        for deleteAndDeactivateJob in deleteAndDeactivateJobs:
+            for scheduledJob in scheduledJobs:
+                if scheduledJob.name == deleteAndDeactivateJob.job_name:
+                    self.scheduler.unschedule_job(scheduledJob)
+            deleteAndDeactivateJob.status = Schedule.DEACTIVATED_STATUS\
+                if deleteAndDeactivateJob.status == Schedule.DEACTIVATE_STATUS\
+                else Schedule.DELETED_STATUS
 
+            deleteAndDeactivateJob.save()
+        
+        # add/update unscheduled jobs
+        split_re  = re.compile("\s+")
+        unScheduledJobs = Schedule.objects.filter( Q(status=Schedule.NEW_STATUS) | Q(status=Schedule.UPDATE_STATUS) )
+        for unScheduledJob in unScheduledJobs:
+            
+            if unScheduledJob.status == Schedule.UPDATE_STATUS:
+                for scheduledJob in scheduledJobs:
+                    if scheduledJob.name == unScheduledJob.job_name:
+                        self.scheduler.unschedule_job(scheduledJob)
+            
+            if unScheduledJob.scheduled_start is not None:
+                schedule = { 'kwargs': { 'unScheduledJob': unScheduledJob }, 'name': unScheduledJob.job_name }
+                
+                try:
+                    newJob = self.scheduler.add_date_job(self.submitJobToFramework, unScheduledJob.scheduled_start, **schedule)
+                    self.logger.debug( 'Job will run on %s' % newJob.next_run_time )
+                except Exception as e:
+                    self.logger.error("Unknown error while submitting jobs to framework: %s" % str(e))
+                    raise Exception
+                else:
+                    unScheduledJob.status = Schedule.ACTIVE_STATUS
+                    unScheduledJob.save()
+            
+            else:
+                cronList = split_re.split(unScheduledJob.cron_expression)
+                schedule = dict(itertools.izip(self.cronScheduleSequence, cronList))
+                
+                schedule['kwargs'] = { 'unScheduledJob': unScheduledJob }
+                schedule['name'] = unScheduledJob.job_name
+                
+                try:
+                    newJob = self.scheduler.add_cron_job(self.submitJobToFramework, **schedule)
+                    self.logger.debug( 'First run of job will be on %s' % newJob.next_run_time )
+                except Exception as e:
+                    self.logger.error("Unknown error while submitting jobs to framework: %s" % str(e))
+                    raise Exception
+                else:
+                    unScheduledJob.status = Schedule.ACTIVE_STATUS
+                    unScheduledJob.save()
+                
     def cleanup(self):
         try:
             self.updateProcessingJobs()
@@ -329,10 +320,17 @@ class SchedulerDaemon(Daemon):
         
     def onNotification(self, eventType, body):
         if eventType == 'JobFinished':
+            
+            # sleep is added, because a failing job can be quicker than 
+            # Django save the frameworkid of that job
+            time.sleep(1) 
             event = JobFinished()
             event.ParseFromString(body)
+            
             self.logger.debug('Job with ID %s is finished with status %s', str(event.job), str(event.status))
-            finishedJob = Job.objects.get(frameworkid = event.job)
+
+            Job.objects.update()
+            finishedJob = Job.objects.get(frameworkid=event.job)
             finishedJob.status = event.status
             finishedJob.finished = datetime.now()
             finishedJob.save()
@@ -341,12 +339,38 @@ class SchedulerDaemon(Daemon):
     def run(self):
         self.logger.info('Started scheduler')
 
-        # initialize scheduler
+        # add active schedules to scheduler
+        split_re  = re.compile("\s+")
+        scheduledJobs = Schedule.objects.filter( status=Schedule.ACTIVE_STATUS )
+
+        for scheduledJob in scheduledJobs:
+
+            if scheduledJob.scheduled_start is not None:
+                schedule = { 'kwargs': { 'unScheduledJob': scheduledJob }, 'name': scheduledJob.job_name }
+                
+                try:
+                    newJob = self.scheduler.add_date_job(self.submitJobToFramework, scheduledJob.scheduled_start, **schedule)
+                except Exception as e:
+                    self.logger.error("Unknown error while submitting jobs to framework: %s" % str(e))
+                    raise Exception
+            else:
+                cronList = split_re.split(scheduledJob.cron_expression)
+                schedule = dict(itertools.izip(self.cronScheduleSequence, cronList))
+                
+                schedule['kwargs'] = { 'unScheduledJob': scheduledJob }
+                schedule['name'] = scheduledJob.job_name
+               
+                try:
+                    newJob = self.scheduler.add_cron_job(self.submitJobToFramework, **schedule)
+                except Exception as e:
+                    self.logger.error("Unknown error while submitting jobs to framework: %s" % str(e))
+                    raise Exception
+
+        # add job scheduling mechanism and cleanup to scheduler and start scheduler 
         try:
-            scheduler = Scheduler(daemonic=True)
-            scheduler.add_interval_job(self.checkJobs, seconds=self.jobSubmitInterval)
-            scheduler.add_interval_job(self.cleanup, minutes=self.jobCleanupInterval)
-            scheduler.start()
+            self.scheduler.add_interval_job(self.checkJobs, seconds=self.jobSubmitInterval)
+            self.scheduler.add_interval_job(self.cleanup, minutes=self.jobCleanupInterval)
+            self.scheduler.start()
         except Exception as e:
             self.logger.error("Unknown error while initializing scheduler: %s" % str(e))
             raise Exception
@@ -366,14 +390,14 @@ class SchedulerDaemon(Daemon):
         except Exception as e:
             self.logger.error("Unknown error: %s" % str(e))
             raise Exception
-
-    def sendFrameworkCommand(self, command):
+        
+    def sendFrameworkCommand(self, command, daemonArgs):
         frameworkResponse = None
         aliases = Aliases()
         try:
             fwkBus = Bus.createConfigurableBus(self.logger, self.config, 'cli')
             fwkBus.openFwChannel()
-            dispatcher = CommandDispatcher(fwkBus, self.logger, self.daemonArgs, self.config, False)
+            dispatcher = CommandDispatcher(fwkBus, self.logger, daemonArgs, self.config, False)
             frameworkResponse = dispatcher.dispatch(command, aliases)
         except BusException, e:
             self.logger.error("Cannot connect to HSN2 Bus because '%s'" % e)
@@ -382,7 +406,7 @@ class SchedulerDaemon(Daemon):
             self.logger.error("Response timeout")
             raise Exception
         except CommandDispatcherMessage as e:
-            if str(e).find(self.daemonArgs.workflow_not_deployed) != -1:
+            if str(e).find(daemonArgs.workflow_not_deployed) != -1:
                 self.logger.warn("Framework reports the Workflow is not deployed.")
                 raise WorkflowNotDeployedException
             else:
@@ -433,7 +457,7 @@ if __name__ == "__main__":
     pid = config.get("scheduler", "pid")
 
     daemon = SchedulerDaemon(pid, config)
-
+    
     if len(sys.argv) == 2:
         if 'start' == sys.argv[1]:
             daemon.start()

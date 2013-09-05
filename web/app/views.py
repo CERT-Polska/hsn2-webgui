@@ -46,15 +46,6 @@ from web.app.tools import *
 from web.app.forms import *
 from web.app.custom.shortcuts import render_response
 
-### FOR DEVELOPMENT ONLY ###
-#import logging.config
-#from logging import getLogger
-#
-#logging.config.fileConfig('/srv/www/hsn2/web/logging.conf')
-#log = logging.getLogger('framework')
-############################
-#TODO: admin en changepassword --> switch user bij SSO
-
 @login_required
 def new_job(request):
     tools = Tools()
@@ -84,14 +75,15 @@ def new_job(request):
             newSchedule.is_public = newJobForm.cleaned_data['is_public']
             newSchedule.job_name = newJobForm.cleaned_data['job_name']
 
-            if newJobForm.cleaned_data['schedule_when'] == 'now':
-                newSchedule.frequency = Schedule.ONCE_FREQUENCY
-            else:
-                newSchedule.frequency = newJobForm.cleaned_data['schedule_frequency']
+            newSchedule.status = Schedule.NEW_STATUS
+
+            if newJobForm.cleaned_data['schedule_when'] == 'once':
                 scheduleDate = newJobForm.cleaned_data['schedule_date']
                 scheduleTime = newJobForm.cleaned_data['schedule_time']
-                newSchedule.scheduled_start = datetime( scheduleDate.year, scheduleDate.month, scheduleDate.day, scheduleTime.hour, scheduleTime.minute )
-
+                newSchedule.scheduled_start = datetime( scheduleDate.year, scheduleDate.month, scheduleDate.day, scheduleTime.hour, scheduleTime.minute )                
+            else:
+                newSchedule.cron_expression = newJobForm.cleaned_data['cron_expression'] 
+                
             newSchedule.save()
 
             if newJobForm.cleaned_data.has_key('feeder_file') and request.FILES:
@@ -143,7 +135,7 @@ def new_job_done(request, job_id):
 
 @login_required
 def schedule_overview(request):
-    all_schedules = Schedule.objects.filter(is_deleted=False).order_by('-last_submit')
+    all_schedules = Schedule.objects.exclude(status=Schedule.DELETED_STATUS).order_by('job_name')
 
     paginator = Paginator(all_schedules, 30)
 
@@ -161,8 +153,10 @@ def schedule_overview(request):
 
 @login_required
 def schedule_details(request, job_id):
-
-    scheduledJob = get_object_or_404(Schedule, id=job_id, is_deleted=False)
+    scheduledJob = get_object_or_404(Schedule, id=job_id)
+    
+    if scheduledJob.status == Schedule.DELETED_STATUS:
+        raise Http404
 
     jobs = Job.objects.filter(schedule=scheduledJob).order_by('-started')
 
@@ -173,11 +167,15 @@ def schedule_details(request, job_id):
     return render_response(request, 'schedule_details.html', \
                           {'schedule_selected': True, \
                            'scheduledJob': scheduledJob, \
-                           'jobs': jobs})
+                           'jobs': jobs, \
+                           'currentTime': datetime.now() })
 
 @login_required
 def schedule_details_edit(request, job_id):
-    scheduledJob = get_object_or_404(Schedule, id=job_id, is_deleted=False)
+    scheduledJob = get_object_or_404(Schedule, id=job_id)
+
+    if scheduledJob.status == Schedule.DELETED_STATUS:
+        raise Http404
 
     user = request.user
     if not user.is_superuser and scheduledJob.created_by is not user:
@@ -210,14 +208,16 @@ def schedule_details_edit(request, job_id):
                 else False
             scheduledJob.job_name = jobForm.cleaned_data['job_name']
 
-            if jobForm.cleaned_data['schedule_when'] == 'now':
-                scheduledJob.frequency = Schedule.ONCE_FREQUENCY
-                scheduledJob.scheduled_start = None
-            else:
-                scheduledJob.frequency = jobForm.cleaned_data['schedule_frequency']
+            scheduledJob.status = Schedule.UPDATE_STATUS
+
+            if jobForm.cleaned_data['schedule_when'] == 'once':
                 scheduleDate = jobForm.cleaned_data['schedule_date']
                 scheduleTime = jobForm.cleaned_data['schedule_time']
                 scheduledJob.scheduled_start = datetime( scheduleDate.year, scheduleDate.month, scheduleDate.day, scheduleTime.hour, scheduleTime.minute )
+                scheduledJob.cron_expression = None                
+            else:
+                scheduledJob.cron_expression = jobForm.cleaned_data['cron_expression']
+                scheduledJob.scheduled_start = None
 
             # add posted parameters
             postedParameters = []
@@ -282,14 +282,14 @@ def schedule_details_edit(request, job_id):
             parameterGroupNumbers.append( str(parameterCount) )
             parameterCount += 1
 
-        if scheduledJob.frequency == Schedule.ONCE_FREQUENCY and scheduledJob.scheduled_start is None:
-            formInput['schedule_when'] = 'now'
+        if scheduledJob.scheduled_start is None:
+            formInput['schedule_when'] = 'cron'
+            formInput['cron_expression'] = scheduledJob.cron_expression
         else:
-            formInput['schedule_when'] = 'later'
-
-        formInput['schedule_date'] = scheduledJob.scheduled_start
-        formInput['schedule_time'] = scheduledJob.scheduled_start
-        formInput['schedule_frequency'] = scheduledJob.frequency
+            formInput['schedule_when'] = 'once'
+            formInput['schedule_date'] = scheduledJob.scheduled_start
+            formInput['schedule_time'] = scheduledJob.scheduled_start.time()
+        
         formInput['is_public'] = 1 if scheduledJob.is_public else 0
         formInput['job_name'] = scheduledJob.job_name
         formInput['workflow'] = scheduledJob.workflow.id
@@ -309,20 +309,27 @@ def schedule_details_edit(request, job_id):
                            })
 
 @login_required
-def schedule_lastrun(request, job_id):
-    jobSchedule = get_object_or_404(Schedule, id=job_id)
-
-    if jobSchedule.last_submit:
-        job = get_object_or_404(Job, schedule=jobSchedule, started=jobSchedule.last_submit)
-        return HttpResponseRedirect("/job/%s/" % job.id)
-    else:
-        raise Http404
+# def schedule_lastrun(request, job_id):
+#     jobSchedule = get_object_or_404(Schedule, id=job_id)
+# 
+#     if jobSchedule.last_submit:
+#         job = get_object_or_404(Job, schedule=jobSchedule, started=jobSchedule.last_submit)
+#         return HttpResponseRedirect("/job/%s/" % job.id)
+#     else:
+#         raise Http404
 
 @login_required
 def jobs_overview(request):
-    all_jobs = Job.objects.all().order_by('-started')
-    paginator = Paginator(all_jobs, 30)
-
+    
+    if request.method == u'POST':
+        jobSearchForm = JobSearchForm(request.POST)
+        all_jobs = Job.objects.filter(name__icontains=request.POST['job_search']).order_by('-started')
+        paginator = Paginator(all_jobs, 30)
+    else:
+        jobSearchForm = JobSearchForm()
+        all_jobs = Job.objects.all().order_by('-started')
+        paginator = Paginator(all_jobs, 30)
+    
     try:
         page = int(request.GET.get('page', '1'))
     except ValueError:
@@ -332,7 +339,12 @@ def jobs_overview(request):
         jobs = paginator.page(page)
     except (EmptyPage, InvalidPage):
         jobs = paginator.page(paginator.num_pages)
-    return render_response(request, 'jobs_overview.html', {'jobs_selected': True, 'jobs': jobs})
+    return render_response(request, 'jobs_overview.html', 
+                           {
+                            'jobs_selected': True, 
+                            'jobs': jobs,
+                            'jobSearchForm': jobSearchForm
+                            })
 
 @login_required
 def job_details(request, job_id):
@@ -352,7 +364,7 @@ def job_details(request, job_id):
     except Exception as e:
         queryResultMessage = str(e) + ". "
 
-    jobFrameworkId = "%s" % job.frameworkid
+    jobFrameworkId = job.frameworkid
     urls = {}
     urlClassification = {}
 
@@ -420,7 +432,7 @@ def analysis_overview(request, job_id, node):
 
     # get url summary
     topAncestor = int(node.split(":")[1])
-    searchValues = [topAncestor, "%s" % job.frameworkid]
+    searchValues = [topAncestor, job.frameworkid]
     summary = {}
     urls = {}
     nodes = []
@@ -440,7 +452,7 @@ def analysis_overview(request, job_id, node):
     try:
         for result in db.view('url_summary_of_url_tree/view', key=searchValues, reduce='false' ):
             nodes.append(result.value['id'])
-            urls[result.value['id']] = {'url': result.value['url'], 'classification': 'UNKNOWN'}
+            urls[result.value['id']] = {'url': result.value['url'], 'classification': 'UNKNOWN', 'origin': result.value['origin'] }
     except Exception as e:
         queryResultMessage += "Cannot process query(2). "
     
@@ -453,6 +465,10 @@ def analysis_overview(request, job_id, node):
                 urls[result.value['id']] = {'url': 'FILE: %s' % urls[possibleUrlId]['url'], 'classification': 'UNKNOWN'}
             else:
                 urls[result.value['id']] = {'url': 'FILE: %s' % result.value['id'], 'classification': 'UNKNOWN'}
+
+            if 'origin' in result.value:
+                urls[result.value['id']]['origin'] = result.value['origin']
+
                 
     except Exception as e:
         queryResultMessage += "Cannot process query(3). "
@@ -510,7 +526,7 @@ def analysis_by_analyzer(request, job_id, node, analyzer):
 
     # get urls
     topAncestor = int(node.split(":")[1])
-    searchValues = [topAncestor, "%s" % job.frameworkid]
+    searchValues = [topAncestor, job.frameworkid]
     urls = {}
     urlsByAnalyzer = {}
     topLevelUrl = ''
@@ -771,20 +787,22 @@ def get_analyzer_details(request):
 @login_required
 def disable_schedule(request):
     if request.method == u'POST' and request.is_ajax():
-        returnToBrowser = {'is_success': False, 'is_disabled': None, 'message': ''}
+        returnToBrowser = {'is_success': False, 'status': None, 'message': ''}
 
         POST = request.POST.copy()
 
         if POST.has_key(u'job_id') and re.match(r'^\d+$', POST['job_id']):
             try:
-                scheduledJob = Schedule.objects.get(id=POST['job_id'], is_deleted=False)
+                scheduledJob = Schedule.objects.get(id=POST['job_id'])
             except ObjectDoesNotExist:
                 returnToBrowser['message'] = u'Schedule does not exist.'
             else:
                 if scheduledJob.is_public or scheduledJob.created_by == request.user:
-                    scheduledJob.is_enabled = False if scheduledJob.is_enabled == 1 else True
+                    scheduledJob.status = Schedule.UPDATE_STATUS \
+                        if scheduledJob.status == Schedule.DEACTIVATE_STATUS or scheduledJob.status == Schedule.DEACTIVATED_STATUS \
+                        else Schedule.DEACTIVATE_STATUS
                     scheduledJob.save()
-                    returnToBrowser['is_disabled'] = scheduledJob.is_enabled
+                    returnToBrowser['status'] = scheduledJob.status
                     returnToBrowser['is_success'] = True
                 else:
                     returnToBrowser['message'] = u'You do not have permission for this action.'
@@ -806,12 +824,12 @@ def delete_schedule(request):
 
         if POST.has_key(u'job_id') and re.match(r'^\d+$', POST['job_id']):
             try:
-                scheduledJob = Schedule.objects.get(id=POST['job_id'], is_deleted=False)
+                scheduledJob = Schedule.objects.get(id=POST['job_id'])
             except ObjectDoesNotExist:
                 returnToBrowser['message'] = u'Schedule does not exist.'
             else:
                 if scheduledJob.is_public or scheduledJob.created_by == request.user:
-                    scheduledJob.is_deleted = True
+                    scheduledJob.status = Schedule.DELETE_STATUS
                     scheduledJob.save()
                     returnToBrowser['is_success'] = True
                 else:

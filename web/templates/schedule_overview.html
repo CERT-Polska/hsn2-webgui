@@ -16,11 +16,11 @@
         <tr class="topdowngradient">
             <th>Job Name</th>
             <th>Run job</th>            
-            <th>Last run</th>
+<!--             <th>Last run</th> -->
             <th>RSS</th>
             <th>Created by</th>            
             <th>Public</th>
-            <th>Enabled</th>
+            <th>Status</th>
         </tr>
     </thead>
     <tbody>
@@ -31,17 +31,13 @@
             <td><a href="/schedule/{{ job.id }}">{{ job.job_name }}</a></td>
             <td class="nowrap">
             {% if job.scheduled_start %}
-            	{% if job.frequency <= 4 %}
-                	{{ job.get_frequency_display }} at {{ job.scheduled_start|date:"H:i" }}
-                {% else %}
-                	{{ job.get_frequency_display }}
-                {% endif %}
+                Once on {{ job.scheduled_start|date:"d-m-Y \a\t H:i" }}
             {% else %}
-            As Soon As Possible
+				{{ job.cron_expression }}
             {% endif %}
             </td>
             
-            <td class="nowrap">{% if job.last_submit %}<a href="/schedule/lastrun/{{ job.id }}/">{{ job.last_submit|date:"N d, Y, H:i" }}</a>{% endif %}</td>
+<!--             <td class="nowrap"><a href="/schedule/lastrun/{{ job.id }}/"></a></td> -->
             <td class="nowrap">
                 <a href="/feeds/{{ job.id }}/all/">All</a> | 
                 <a href="/feeds/{{ job.id }}/nonbenign/">Non-Benign</a>
@@ -61,13 +57,7 @@
                 <img src="{% admin_media_prefix %}img/admin/icon-no.gif" alt="NO">
             {% endif %}
             </td>
-            <td class="center">
-            {% if job.is_enabled %}
-                <img src="{% admin_media_prefix %}img/admin/icon-yes.gif" alt="YES">
-            {% else %}
-                <img src="{% admin_media_prefix %}img/admin/icon-no.gif" alt="NO">
-            {% endif %}            
-            </td>
+            <td>{{ job.get_status_display|upper }}</td>
         </tr>
         
         {% else %}
@@ -76,13 +66,13 @@
             <td></td>
             <td>
             {% if job.scheduled_start %}
-                {{ job.get_frequency_display }} at {{ job.scheduled_start|date:"H:i" }}
+                Once at {{ job.scheduled_start|date:"H:i" }}
             {% else %}
-            As Soon As Possible
+            	{{ job.cron_expression }}
             {% endif %}
             </td>
             
-            <td>{% if job.last_submit %}{{ job.last_submit|date:"N d, Y, H:i" }}{% endif %}</td>
+<!--             <td>TODO</td> -->
             
             <td></td>
             <td></td>            
@@ -93,13 +83,7 @@
                 <img src="{% admin_media_prefix %}img/admin/icon-no.gif" alt="NO">
             {% endif %}
             </td>
-            <td class="center">
-            {% if job.is_enabled %}
-                <img src="{% admin_media_prefix %}img/admin/icon-yes.gif" alt="YES">
-            {% else %}
-                <img src="{% admin_media_prefix %}img/admin/icon-no.gif" alt="NO">
-            {% endif %}            
-            </td>
+            <td>{{ job.get_status_display|upper }}</td>
         </tr>
         {% endifjobrights %}
 {% endfor %}    

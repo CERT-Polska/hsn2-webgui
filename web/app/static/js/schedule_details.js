@@ -23,12 +23,15 @@ $( function () {
 				{ job_id: $(this).attr('data-jobid') }, 
 				function (result) {
 					if ( result.is_success ) {
-						$('#div_jobDisabled').toggle(!result.is_disabled);
-						if ( result.is_disabled ) {
-							$('#btn_disableSchedule').text('Disable schedule');
+						$('#div_jobDisabled').toggle( !result.is_disabled );
+						if ( result.status != 4 && result.status != 7 ) {
+							$('#div_jobDisabled').hide();
 						} else {
-							$('#btn_disableSchedule').text('Enable schedule');
-						}
+							$('#div_jobDisabled').show();
+						} 
+						
+						$('#btn_disableSchedule').parent('li').html('<span>Updating status</span>');
+
 					} else {
 						$('#div_errorMessage')
 							.text(result.message)

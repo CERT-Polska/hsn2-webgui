@@ -91,24 +91,42 @@
                {{ jobForm.schedule_when }}
                {{ jobForm.schedule_when.errors }}
             </div>
-            <span id="span_scheduling_options">Date, time and frequency options</span>          
-            <div id="div_scheduling_options" style="display:None">
-                <div class="schedule_later_options">
-                    <label for="id_schedule_later_date" class="label">Start date:</label>
+                      
+            <div id="div_scheduling_options_once" style="display:None">
+            	<span id="span_scheduling_options_once" class="italic">Date and time options</span>
+                <div class="schedule_once_options">
+                    <label for="id_schedule_once_date" class="label">Start date:</label>
                     {{ jobForm.schedule_date }}
                     {{ jobForm.schedule_date.errors }}
                 </div>
-                <div class="schedule_later_options">
-                    <label for="id_schedule_later_time" class="label">Start time:</label>
+                <div class="schedule_once_options">
+                    <label for="id_schedule_time" class="label">Start time:</label>
                     {{ jobForm.schedule_time }}
                     {{ jobForm.schedule_time.errors }}
                 </div>
-                <div class="schedule_later_options">
-                
-                    <span class="label">Frequency:</span>               
-                    {{ jobForm.schedule_frequency }}
-                    {{ jobForm.schedule_frequency.errors }}
-                </div>
+            </div>
+
+            <div id="div_scheduling_options_cron" style="display:None">
+            	<span id="span_scheduling_options_cron" class="italic">Cron-like scheduling</span>
+                <div class="schedule_cron_options">
+                    <label for="id_schedule_cron_expression" class="label">Cron expression:</label>
+                    {{ jobForm.cron_expression }}
+                    {{ jobForm.cron_expression.errors }}
+                </div><br>
+                <span class="label">&nbsp;</span>
+            <pre class="inline monospacefont">
+ *    *    *    *    *
+ ┬    ┬    ┬    ┬    ┬
+ │    │    │    │    │
+ │    │    │    │    │
+ │    │    │    │    └───── day of week (0 - 6 or mon, tue, wed, thu, fri, sat, sun)
+ │    │    │    └────────── month (1 - 12)
+ │    │    └─────────────── day of month (1 - 31)
+ │    └──────────────────── hour (0 - 23)
+ └───────────────────────── minute (0 - 59)
+ 
+ Note: 'day of week' starts on monday. 
+            </pre>
             </div>
        </fieldset>
     

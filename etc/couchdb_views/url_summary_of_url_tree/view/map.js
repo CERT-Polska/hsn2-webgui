@@ -9,7 +9,8 @@ function(doc) {
 				{ 
 					classification: doc.classification,
 					url: url,
-					id: doc._id
+					id: doc._id,
+					origin: doc.origin
 				}
 			);
     } 

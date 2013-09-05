@@ -125,11 +125,12 @@ input[type="radio"] {
     padding-bottom: 10px;
 }
 
+.monospacefont { font-family: courier, courier-new; }
 .bold { font-weight: bold; }
 .italic { font-style:italic; }	
 .fontWeightNormal { font-weight: normal; }
 .nowrap { white-space: nowrap; }
-
+.break-word { word-wrap: break-word; }
 .align_top { vertical-align: top; }
 .minwidth_200 { min-width: 200px; }
 .width_narrow { width: 50px;}
@@ -330,7 +331,12 @@ fieldset div:last-child {
 
 .tr_disabled { color: #909090; }
 
-/**********************/
+#jobSearchWrapper { 
+	border-top: 1px solid #ccc;
+	border-left: 1px solid #ccc;
+	border-right: 1px solid #ccc;
+}
+
 /************** DataTables *****************/
 .tbl_dataTables {
     width: 100%;
@@ -537,7 +543,7 @@ fieldset div:last-child {
     background-color: grey;
 }
 
-.object-tools a:link, .object-tools a:visited {
+.object-tools a:link, .object-tools a:visited, .object-tools span {
     display: block;
     float: left;
     color: white;
@@ -545,3 +551,6 @@ fieldset div:last-child {
     height: 14px;
 }
 
+.object-tools span { color: lightgrey; }
+
+#div_scheduling_options_once { border: none !important; }

@@ -20,13 +20,17 @@
     <li>
       <a href="/schedule/edit/{{ scheduledJob.id }}" class="">Edit schedule</a>
     </li>
+	{% if scheduledJob.scheduled_start == None or scheduledJob.scheduled_start|date:"YmdHi" > currentTime|date:"YmdHi" %}
     <li>
-    {% if scheduledJob.is_enabled  %}
-      <a href="#" class="" id="btn_disableSchedule" data-jobid="{{ scheduledJob.id }}">Disable schedule</a>
-    {% else %}  
-      <a href="#" class="" id="btn_disableSchedule" data-jobid="{{ scheduledJob.id }}">Enable schedule</a>
-    {% endif %}
+		{% if scheduledJob.status == 4 or scheduledJob.status == 7 %}
+		<a href="#" class="" id="btn_disableSchedule" data-jobid="{{ scheduledJob.id }}">Enable schedule</a>
+		{% elif scheduledJob.status == 3 %}
+		<a href="#" class="" id="btn_disableSchedule" data-jobid="{{ scheduledJob.id }}">Disable schedule</a>
+		{% else %}
+		<span>Updating status</span>
+		{% endif %}
     </li>
+    {% endif %}
     <li>
       <a href="#" class="" id="btn_deleteSchedule" data-jobid="{{ scheduledJob.id }}">Delete schedule</a>
     </li>
@@ -37,7 +41,7 @@
 
 <fieldset>
      <legend>Job schedule summary</legend>
-     <div class="error" id="div_jobDisabled" {% if scheduledJob.is_enabled == 1 %}style="display:none;"{% endif %}>
+     <div class="error" id="div_jobDisabled" {% if scheduledJob.status != 4 and scheduledJob.status != 7 %}style="display:none;"{% endif %}>
      This job schedule has been disabled and will not participate in scheduling.
      </div>
      <div>
@@ -62,13 +66,9 @@
         <span class="label">Job is scheduled to run:</span>
         <span class="label">
             {% if scheduledJob.scheduled_start %}
-            	{% if scheduledJob.frequency <= 4 %}
-                	{{ scheduledJob.get_frequency_display }} at {{ scheduledJob.scheduled_start|date:"H:i" }}
-                {% else %}
-                	{{ scheduledJob.get_frequency_display }}
-                {% endif %}
+               	Once on {{ scheduledJob.scheduled_start|date:"d-m-Y \a\t H:i" }}
             {% else %}
-            As Soon As Possible
+				{{ scheduledJob.cron_expression }}
             {% endif %}
         </span>
      </div>

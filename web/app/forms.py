@@ -21,12 +21,14 @@ from django import forms
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.forms.extras.widgets import SelectDateWidget
 from django.conf import settings
+from croniter import croniter
+from datetime import datetime
 
 from web.app.models import Schedule, Workflow
 from web.app.custom.form import CustomRadioFieldRenderer
 
 ISPUBLIC_CHOICES = ((1, 'Yes'), (0, 'No'))
-SCHEDULEWHEN_CHOICES = (('now', 'Once, as soon as possible'), ('later', 'Set date, time and frequency'))
+SCHEDULEWHEN_CHOICES = (('once', 'Once, at given date and time'), ('cron', 'Schedule with cron-like expression'))
 
 
 class JobForm (forms.Form):
@@ -34,25 +36,19 @@ class JobForm (forms.Form):
     schedule_when = forms.ChoiceField(
                                       choices=SCHEDULEWHEN_CHOICES,
                                       widget=forms.RadioSelect(renderer=CustomRadioFieldRenderer),
-                                      initial='now'
+                                      initial='once'
                                     )
 
     schedule_date = forms.DateField( required=False, widget=SelectDateWidget() )
     schedule_time = forms.TimeField(
                                      required=False,
                                      input_formats=['%H:%M'],
-                                     widget=forms.TimeInput( format='%H:%M', \
-                                                             attrs={'placeholder': 'HH:MM', 'class': 'width_narrow'} )
+                                     widget=forms.TimeInput( format='%H:%M', attrs={'placeholder': 'HH:MM', 'class': 'width_narrow'} )
                                     )
 
-    schedule_frequency = forms.ChoiceField(
-                                            required=False,
-                                            choices=Schedule.SCHEDULE_FREQUENCY,
-                                            widget=forms.RadioSelect(renderer=CustomRadioFieldRenderer),
-                                            initial='0'
-                                           )
-
-    job_name = forms.CharField( widget=forms.TextInput( attrs={'class': 'minwidth_200'}))
+    cron_expression = forms.CharField( required=False, widget=forms.TextInput( attrs={'class': 'minwidth_200'} ) )
+    
+    job_name = forms.CharField( widget=forms.TextInput( attrs={'class': 'minwidth_200'} ) )
 
     is_public = forms.ChoiceField(
                                     choices=ISPUBLIC_CHOICES,
@@ -106,21 +102,45 @@ class JobForm (forms.Form):
             scheduleWhen = self.cleaned_data.get('schedule_when', None)
             scheduleDate = self.cleaned_data.get('schedule_date', None)
             scheduleTime = self.cleaned_data.get('schedule_time', None)
-            scheduleFrequency = self.cleaned_data.get('schedule_frequency', None)
+            cronExpression = self.cleaned_data.get('cron_expression', None)
+            jobName = self.cleaned_data.get('job_name', None)
+            
             workflowId = self.cleaned_data.get('workflow', None)
 
-            if scheduleWhen == 'later' and \
-                ( scheduleDate == None or scheduleTime == None or scheduleFrequency == None ):
-
+            if scheduleWhen == 'once':
                 if scheduleDate == None and self._errors.get('schedule_date', None) == None:
-                    self._errors['schedule_date'] = self.error_class(['When scheduling a job a date is required.'])
-
+                    self._errors['schedule_date'] = self.error_class(['A valid date is required.'])
+ 
                 if scheduleTime == None and self._errors.get('schedule_time', None) == None:
-                    self._errors['schedule_time'] = self.error_class(['When scheduling a job a time is required.'])
+                    self._errors['schedule_time'] = self.error_class(['A valid time is required.'])
 
-                if scheduleFrequency == None:
-                    self._errors['schedule_frequency'] = self.error_class(['When scheduling a job selecting a frequency is required.'])
-
+                try:
+                    if datetime( scheduleDate.year, scheduleDate.month, scheduleDate.day, scheduleTime.hour, scheduleTime.minute ) <= datetime.now():
+                        self._errors['schedule_date'] = self.error_class(['Cannot schedule jobs to run in the past.'])
+                        self._errors['schedule_time'] = self.error_class(['Cannot schedule jobs to run in the past.'])
+                except:
+                    pass
+            
+            if scheduleWhen == 'cron':
+                if cronExpression == None:
+                    self._errors['cron_expression'] = self.error_class(['A valid cron expression is required.'])
+                else:
+                    dtBase = datetime.now()
+                    try:
+                        cronSchedule = croniter( cronExpression, dtBase )
+                    except Exception as e:
+                        self._errors['cron_expression'] = self.error_class(['Cron expression not accepted.'])
+                    else:
+                        split_re = re.compile("\s+")
+                        cronList = split_re.split( cronExpression )                        
+                        if len( cronList ) is not 5:
+                            self._errors['cron_expression'] = self.error_class(['Cron expression only accepts 5 columns'])
+                        elif re.match( '[a-zA-Z]', cronList[3]):
+                            print 'Invalid month expression'
+            
+            if Schedule.objects.filter(job_name=jobName).exclude(status=Schedule.DELETED_STATUS).count() > 1:
+                self._errors['job_name'] = self.error_class(['A job schedule with this name already exists'])
+            
             try:
                 self.cleaned_data['workflow'] = Workflow.objects.get(id=workflowId)
             except ObjectDoesNotExist:
@@ -153,3 +173,8 @@ class JobForm (forms.Form):
                     self._errors['workflow_parameter_service_%s' % groupNumber] = self.error_class(["Please specify 'service', 'name' and 'value'."])
 
             return self.cleaned_data
+
+
+class JobSearchForm (forms.Form):
+    job_search = forms.CharField( widget=forms.TextInput( attrs={'class': 'minwidth_200'}))
+    
