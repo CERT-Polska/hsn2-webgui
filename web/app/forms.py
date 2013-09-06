@@ -125,6 +125,9 @@ class JobForm (forms.Form):
                 if cronExpression == None:
                     self._errors['cron_expression'] = self.error_class(['A valid cron expression is required.'])
                 else:
+                    
+                    cronExpression = re.sub('\s+', ' ', cronExpression)
+                    
                     dtBase = datetime.now()
                     try:
                         cronSchedule = croniter( cronExpression, dtBase )

@@ -16,4 +16,8 @@ pip install croniter
 
 update database by running UPGRADE_05092013.sql in MySQL.
 Example:
-mysql -u hsn2 -p -h localhost hsn2 < UPGRADE_05092013.sql 
+mysql -u hsn2 -p -h localhost hsn2 < UPGRADE_05092013.sql
+
+Synchornize CouchDB views:
+Example:
+python /srv/www/hsn2/etc/couchdb_views/couchdb_views.py -s

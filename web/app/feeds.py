@@ -30,7 +30,10 @@ class JobFeed(Feed):
         return get_object_or_404(Schedule, id=job_id)
 
     def description(self, scheduledJob):
-        return "Job frequency is %s" % ( scheduledJob.get_frequency_display() )
+        if scheduledJob.scheduled_start is not None:
+            return "Job is scheduled to run on %s" % ( scheduledJob.scheduled_start )
+        else:
+            return "Job is scheduled to with cron expression %s" % ( scheduledJob.cron_expression )
 
     def item_title(self, item):
         itemTitle = "[%s] %s" % (item['classification'], item['url'])

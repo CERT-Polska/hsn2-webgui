@@ -45,7 +45,6 @@ urlpatterns = patterns('web.app.views',
     (r'^schedule/$', 'schedule_overview'),
     (r'^schedule/(?P<job_id>\d+)/$', 'schedule_details'),
     (r'^schedule/edit/(?P<job_id>\d+)/$', 'schedule_details_edit'),
-    (r'^schedule/lastrun/(?P<job_id>\d+)/$', 'schedule_lastrun'),
 
     (r'^newjob/$', 'new_job'),
     (r'^newjobdone/(?P<job_id>\d+)/$', 'new_job_done'),

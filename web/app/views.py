@@ -82,7 +82,7 @@ def new_job(request):
                 scheduleTime = newJobForm.cleaned_data['schedule_time']
                 newSchedule.scheduled_start = datetime( scheduleDate.year, scheduleDate.month, scheduleDate.day, scheduleTime.hour, scheduleTime.minute )                
             else:
-                newSchedule.cron_expression = newJobForm.cleaned_data['cron_expression'] 
+                newSchedule.cron_expression = re.sub('\s+', ' ', newJobForm.cleaned_data['cron_expression'] ) 
                 
             newSchedule.save()
 
@@ -216,7 +216,7 @@ def schedule_details_edit(request, job_id):
                 scheduledJob.scheduled_start = datetime( scheduleDate.year, scheduleDate.month, scheduleDate.day, scheduleTime.hour, scheduleTime.minute )
                 scheduledJob.cron_expression = None                
             else:
-                scheduledJob.cron_expression = jobForm.cleaned_data['cron_expression']
+                scheduledJob.cron_expression = re.sub('\s+', ' ', jobForm.cleaned_data['cron_expression'] )
                 scheduledJob.scheduled_start = None
 
             # add posted parameters
@@ -307,16 +307,6 @@ def schedule_details_edit(request, job_id):
                            'parameterPrefixes': ['workflow_parameter_service_', 'workflow_parameter_name_', 'workflow_parameter_value_'],
                            'feederFileIsUsed': feederFileIsUsed
                            })
-
-@login_required
-# def schedule_lastrun(request, job_id):
-#     jobSchedule = get_object_or_404(Schedule, id=job_id)
-# 
-#     if jobSchedule.last_submit:
-#         job = get_object_or_404(Job, schedule=jobSchedule, started=jobSchedule.last_submit)
-#         return HttpResponseRedirect("/job/%s/" % job.id)
-#     else:
-#         raise Http404
 
 @login_required
 def jobs_overview(request):
