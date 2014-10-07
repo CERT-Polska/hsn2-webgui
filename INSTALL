@@ -17,7 +17,7 @@ pip install pika
 pip install pycrypto 
 pip install paramiko
 pip install CouchDB
-pip install APScheduler
+pip install apscheduler==2.1.2
 pip install croniter
 
 -- install dateutil for python 2.X
